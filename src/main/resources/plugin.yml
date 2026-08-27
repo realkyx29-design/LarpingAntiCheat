@@ -4,7 +4,7 @@ main: me.larping.anticheat.LarpingAntiCheat
 api-version: '1.21'
 author: Larping
 website: https://github.com/realkyx29-design/LarpingAntiCheat
-description: Conservative, production-ready anti-cheat for Paper 1.21.11 custom SMP servers with very low false positives.
+description: Production-ready anti-cheat for Paper 1.21.11 custom SMP servers, focusing on blocking cheat clients and exploits.
 commands:
   lac:
     description: LarpingAntiCheat administration and check management

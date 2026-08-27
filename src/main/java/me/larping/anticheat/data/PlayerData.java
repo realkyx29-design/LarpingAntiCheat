@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Encapsulates runtime tracking data for each online player.
- * Tracks movement history, click rates, placement rates, grace periods, and buffers.
+ * Tracks movement history, placement rates, grace periods, buffers, and packet/timer timestamps.
  */
 public final class PlayerData {
     private final Player player;
@@ -30,9 +30,8 @@ public final class PlayerData {
     private int airTicks = 0;
     private int speedBuffer = 0;
     private int flyBuffer = 0;
-
-    // Click tracking for AutoClicker
-    private final LinkedList<Long> clickTimestamps = new LinkedList<>();
+    private int timerBuffer = 0;
+    private long lastPacketTime = 0;
 
     // Scaffold tracking
     private final LinkedList<Long> placementTimestamps = new LinkedList<>();
@@ -109,6 +108,23 @@ public final class PlayerData {
         return this.flyBuffer;
     }
 
+    public int timerBuffer() {
+        return timerBuffer;
+    }
+
+    public int timerBuffer(int value) {
+        this.timerBuffer = Math.max(0, value);
+        return this.timerBuffer;
+    }
+
+    public long lastPacketTime() {
+        return lastPacketTime;
+    }
+
+    public void recordPacketTime(long time) {
+        this.lastPacketTime = time;
+    }
+
     public void exempt(long ticks) {
         this.exemptUntil = Math.max(this.exemptUntil, System.currentTimeMillis() + (ticks * 50L));
     }
@@ -128,30 +144,6 @@ public final class PlayerData {
                now < joinGraceUntil ||
                now < respawnGraceUntil ||
                now < worldChangeGraceUntil;
-    }
-
-    public void recordClick() {
-        long now = System.currentTimeMillis();
-        synchronized (clickTimestamps) {
-            clickTimestamps.addLast(now);
-            while (!clickTimestamps.isEmpty() && now - clickTimestamps.getFirst() > 3000) {
-                clickTimestamps.removeFirst();
-            }
-        }
-        lastActionTime = now;
-    }
-
-    public List<Long> getClickTimestamps() {
-        synchronized (clickTimestamps) {
-            return new ArrayList<>(clickTimestamps);
-        }
-    }
-
-    public int getRecentCPS() {
-        long now = System.currentTimeMillis();
-        synchronized (clickTimestamps) {
-            return (int) clickTimestamps.stream().filter(t -> now - t <= 1000).count();
-        }
     }
 
     public void recordPlacement() {

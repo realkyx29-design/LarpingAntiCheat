@@ -2,10 +2,14 @@ package me.larping.anticheat.listeners;
 
 import me.larping.anticheat.LarpingAntiCheat;
 import me.larping.anticheat.checks.CheckContext;
-import me.larping.anticheat.checks.combat.AutoClickerCheck;
 import me.larping.anticheat.checks.combat.ReachCheck;
+import me.larping.anticheat.checks.combat.RotationCheck;
 import me.larping.anticheat.checks.movement.FlyCheck;
+import me.larping.anticheat.checks.movement.FreecamCheck;
+import me.larping.anticheat.checks.movement.GroundSpoofCheck;
+import me.larping.anticheat.checks.movement.PhaseCheck;
 import me.larping.anticheat.checks.movement.SpeedCheck;
+import me.larping.anticheat.checks.movement.TimerCheck;
 import me.larping.anticheat.checks.world.ScaffoldCheck;
 import me.larping.anticheat.data.PlayerData;
 import org.bukkit.GameMode;
@@ -27,8 +31,12 @@ public final class AntiCheatListener implements Listener {
     private final SpeedCheck speedCheck = new SpeedCheck();
     private final FlyCheck flyCheck = new FlyCheck();
     private final ReachCheck reachCheck = new ReachCheck();
-    private final AutoClickerCheck autoClickerCheck = new AutoClickerCheck();
     private final ScaffoldCheck scaffoldCheck = new ScaffoldCheck();
+    private final TimerCheck timerCheck = new TimerCheck();
+    private final GroundSpoofCheck groundSpoofCheck = new GroundSpoofCheck();
+    private final PhaseCheck phaseCheck = new PhaseCheck();
+    private final RotationCheck rotationCheck = new RotationCheck();
+    private final FreecamCheck freecamCheck = new FreecamCheck();
 
     public AntiCheatListener(LarpingAntiCheat plugin) {
         this.plugin = plugin;
@@ -94,9 +102,7 @@ public final class AntiCheatListener implements Listener {
     public void onMove(PlayerMoveEvent event) {
         Location from = event.getFrom();
         Location to = event.getTo();
-        if (to == null || (from.getX() == to.getX() && from.getY() == to.getY() && from.getZ() == to.getZ())) {
-            return;
-        }
+        if (to == null) return;
 
         Player player = event.getPlayer();
         if (player.getGameMode() == GameMode.SPECTATOR || player.getGameMode() == GameMode.CREATIVE) {
@@ -108,8 +114,14 @@ public final class AntiCheatListener implements Listener {
 
         CheckContext context = new CheckContext(plugin, player, data);
 
+        // Evaluate cheat client protection checks
+        timerCheck.evaluate(player, context);
         speedCheck.evaluate(player, context);
         flyCheck.evaluate(player, context);
+        groundSpoofCheck.evaluate(player, context);
+        phaseCheck.evaluate(player, context);
+        rotationCheck.evaluate(player, context);
+        freecamCheck.evaluate(player, context);
 
         if (player.isOnGround() && !data.isGraceful()) {
             data.safeLocation(to);
@@ -135,24 +147,14 @@ public final class AntiCheatListener implements Listener {
         data.recordPlacement();
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onAnimation(PlayerAnimationEvent event) {
-        Player player = event.getPlayer();
-        if (event.getAnimationType() == PlayerAnimationType.ARM_SWING) {
-            PlayerData data = plugin.data(player);
-            data.recordClick();
-
-            CheckContext context = new CheckContext(plugin, player, data);
-            autoClickerCheck.evaluate(player, context);
-        }
-    }
-
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onAttack(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof Player attacker) {
+            PlayerData data = plugin.data(attacker);
+            CheckContext context = new CheckContext(plugin, attacker, data);
+            rotationCheck.evaluate(attacker, context);
+
             if (event.getEntity() instanceof LivingEntity target) {
-                PlayerData data = plugin.data(attacker);
-                CheckContext context = new CheckContext(plugin, attacker, data);
                 reachCheck.evaluateAttack(attacker, target, context);
             }
         }

@@ -1,30 +1,24 @@
 # =====================================================================
 # LarpingAntiCheat - Production Configuration
-# Conservative, custom-SMP friendly anti-cheat for Paper 1.21.11
+# Focused on patching modern cheat clients (TikTok / Web cheat clients)
+# Conservative & Custom-SMP friendly for Paper 1.21.11
 # =====================================================================
 
-# Global switch for administrator violation alert broadcasts
 alerts:
   enabled: true
   format: "[LAC] Player §f%player% §7failed §f%check% §7(VL: §c%vl%§7, Ping: §e%ping%ms§7, TPS: §e%tps%§7)"
 
-# Global logging of anti-cheat violations to console/file
 logging:
   enabled: false
   include-location: true
 
-# Permission required to bypass all checks entirely
 exempt-permission: "lac.bypass"
-
-# Violation decay rate per second (reduces false accumulation over time)
 violation-decay-per-second: 0.15
 
-# Global Ping and TPS Compensation (makes detection more conservative under lag)
 compensation:
   ping: true
   tps: true
 
-# Grace periods in milliseconds (prevents false positives after server events)
 grace-periods:
   teleport: 1000
   velocity: 500
@@ -33,12 +27,10 @@ grace-periods:
   respawn: 1500
   world-change: 1000
 
-# Setback system (teleports player back to safe location upon excessive violations)
 setbacks:
   enabled: true
   conservative-only: true
 
-# Punishments are DISABLED by default. Never automatically ban players by default.
 punishments:
   enabled: false
   actions:
@@ -47,7 +39,6 @@ punishments:
     - threshold: 50
       command: "ban %player% Unfair advantage detected"
 
-# Custom Mod & SMP Compatibility settings
 compatibility:
   custom-mods:
     enabled: true
@@ -56,8 +47,6 @@ compatibility:
     combat-compensation: true
     block-placement-compensation: true
 
-# Individual check configurations
-# Sensitivity: 0.1 (very tolerant) to 1.0 (strict). Conservative defaults used.
 checks:
   speed:
     enabled: true
@@ -86,15 +75,6 @@ checks:
     max-distance: 3.65
     min-confirmations: 4
 
-  autoclicker:
-    enabled: true
-    sensitivity: 0.5
-    alert-threshold: 6.0
-    setback-threshold: 12.0
-    punishment-threshold: 30.0
-    max-cps: 20
-    min-samples: 45
-
   scaffold:
     enabled: true
     sensitivity: 0.5
@@ -103,3 +83,41 @@ checks:
     punishment-threshold: 25.0
     max-placements-per-sec: 22
     min-confirmations: 4
+
+  timer:
+    enabled: true
+    sensitivity: 0.5
+    alert-threshold: 5.0
+    setback-threshold: 10.0
+    punishment-threshold: 25.0
+    max-packet-rate: 25
+
+  groundspoof:
+    enabled: true
+    sensitivity: 0.5
+    alert-threshold: 4.0
+    setback-threshold: 8.0
+    punishment-threshold: 20.0
+
+  phase:
+    enabled: true
+    sensitivity: 0.5
+    alert-threshold: 4.0
+    setback-threshold: 8.0
+    punishment-threshold: 20.0
+
+  rotation:
+    enabled: true
+    sensitivity: 0.5
+    alert-threshold: 5.0
+    setback-threshold: 10.0
+    punishment-threshold: 25.0
+    max-delta-yaw: 180.0
+
+  freecam:
+    enabled: true
+    sensitivity: 0.5
+    alert-threshold: 5.0
+    setback-threshold: 10.0
+    punishment-threshold: 25.0
+    max-distance: 12.0

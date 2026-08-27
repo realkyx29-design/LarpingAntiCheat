@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 
 public final class LacCommand implements CommandExecutor, TabCompleter {
     private final LarpingAntiCheat plugin;
+    private static final List<String> CHECKS = List.of("speed", "fly", "reach", "scaffold", "timer", "groundspoof", "phase", "rotation", "freecam");
 
     public LacCommand(LarpingAntiCheat plugin) {
         this.plugin = plugin;
@@ -36,8 +37,8 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
 
         switch (sub) {
             case "checks": {
-                sender.sendMessage("§8[§cLAC§8] §eRegistered Checks Status:");
-                for (String check : List.of("speed", "fly", "reach", "autoclicker", "scaffold")) {
+                sender.sendMessage("§8[§cLAC§8] §eRegistered Cheat Client & Exploit Checks:");
+                for (String check : CHECKS) {
                     boolean enabled = plugin.configManager().isCheckEnabled(check);
                     double sensitivity = plugin.configManager().getSensitivity(check);
                     sender.sendMessage("§7- §f" + check + ": " + (enabled ? "§aENABLED" : "§cDISABLED") + " §7(Sensitivity: §f" + sensitivity + "§7)");
@@ -47,7 +48,7 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
             case "enable":
             case "disable": {
                 if (args.length < 2) {
-                    sender.sendMessage("§cUsage: /lac " + sub + " <speed|fly|reach|autoclicker|scaffold>");
+                    sender.sendMessage("§cUsage: /lac " + sub + " <check>");
                     return true;
                 }
                 String checkName = args[1].toLowerCase();
@@ -150,7 +151,7 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2) {
             String sub = args[0].toLowerCase();
             if (sub.equals("enable") || sub.equals("disable")) {
-                return Stream.of("speed", "fly", "reach", "autoclicker", "scaffold")
+                return CHECKS.stream()
                         .filter(s -> s.startsWith(args[1].toLowerCase()))
                         .toList();
             }
@@ -162,7 +163,7 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
             }
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("debug")) {
-            return Stream.of("speed", "fly", "reach", "autoclicker", "scaffold", "all")
+            return Stream.concat(Stream.of("all"), CHECKS.stream())
                     .filter(s -> s.startsWith(args[2].toLowerCase()))
                     .toList();
         }
