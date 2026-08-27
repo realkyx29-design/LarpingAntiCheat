@@ -8,7 +8,7 @@ description: Production-ready anti-cheat for Paper 1.21.11 custom SMP servers, f
 commands:
   lac:
     description: LarpingAntiCheat administration and check management
-    usage: /lac <checks|enable|disable|reload|debug|alerts|info|violations|clear>
+    usage: /lac <checks|enable|disable|reload|alerts|violations|clear|debug>
     permission: lac.admin
 permissions:
   lac.admin:
