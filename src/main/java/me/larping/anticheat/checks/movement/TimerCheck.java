@@ -20,11 +20,13 @@ public final class TimerCheck extends MovementCheck {
 
         if (lastPacket > 0) {
             long diff = now - lastPacket;
-            if (diff < 30) {
+            // Extremely conservative threshold: only flag when packets arrive faster than 15ms consistently (over 66 packets/sec)
+            if (diff < 15) {
                 int buffer = context.data().timerBuffer(context.data().timerBuffer() + 1);
-                if (buffer >= 8) {
-                    double vlAmount = 0.4;
-                    double confidence = 0.82;
+                int minConfirm = context.plugin().getConfig().getInt("checks.timer.min-confirmations", 12);
+                if (buffer >= minConfirm) {
+                    double vlAmount = 0.3;
+                    double confidence = 0.80;
                     context.plugin().violations().add(
                             player,
                             "Timer",
@@ -35,7 +37,7 @@ public final class TimerCheck extends MovementCheck {
                     );
                 }
             } else {
-                context.data().timerBuffer(context.data().timerBuffer() - 1);
+                context.data().timerBuffer(context.data().timerBuffer() - 2);
             }
         }
     }

@@ -13,7 +13,7 @@ logging:
   include-location: true
 
 exempt-permission: "lac.bypass"
-violation-decay-per-second: 0.15
+violation-decay-per-second: 0.20
 
 compensation:
   ping: true
@@ -23,9 +23,9 @@ grace-periods:
   teleport: 1000
   velocity: 500
   damage: 500
-  join: 1500
-  respawn: 1500
-  world-change: 1000
+  join: 2000
+  respawn: 2000
+  world-change: 1500
 
 setbacks:
   enabled: true
@@ -34,9 +34,9 @@ setbacks:
 punishments:
   enabled: false
   actions:
-    - threshold: 25
+    - threshold: 30
       command: "kick %player% Suspicious activity detected"
-    - threshold: 50
+    - threshold: 60
       command: "ban %player% Unfair advantage detected"
 
 compatibility:
@@ -50,74 +50,72 @@ compatibility:
 checks:
   speed:
     enabled: true
-    sensitivity: 0.5
-    alert-threshold: 5.0
-    setback-threshold: 10.0
-    punishment-threshold: 25.0
-    max-horizontal-per-tick: 0.78
-    min-confirmations: 5
+    sensitivity: 0.4
+    alert-threshold: 6.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    max-horizontal-per-tick: 0.85
+    min-confirmations: 8
 
   fly:
     enabled: true
-    sensitivity: 0.5
-    alert-threshold: 5.0
-    setback-threshold: 10.0
-    punishment-threshold: 25.0
-    air-ticks: 40
-    min-confirmations: 6
+    sensitivity: 0.4
+    alert-threshold: 6.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    air-ticks: 55
+    min-confirmations: 8
 
   reach:
     enabled: true
-    sensitivity: 0.5
-    alert-threshold: 5.0
-    setback-threshold: 10.0
-    punishment-threshold: 25.0
-    max-distance: 3.65
-    min-confirmations: 4
+    sensitivity: 0.4
+    alert-threshold: 6.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    max-distance: 3.85
+    min-confirmations: 6
 
   scaffold:
     enabled: true
-    sensitivity: 0.5
-    alert-threshold: 5.0
-    setback-threshold: 10.0
-    punishment-threshold: 25.0
-    max-placements-per-sec: 22
-    min-confirmations: 4
+    sensitivity: 0.4
+    alert-threshold: 6.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    max-placements-per-sec: 25
+    min-confirmations: 6
 
   timer:
     enabled: true
-    sensitivity: 0.5
-    alert-threshold: 5.0
-    setback-threshold: 10.0
-    punishment-threshold: 25.0
-    max-packet-rate: 25
+    sensitivity: 0.4
+    alert-threshold: 6.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    min-confirmations: 12
 
   groundspoof:
     enabled: true
-    sensitivity: 0.5
-    alert-threshold: 4.0
-    setback-threshold: 8.0
-    punishment-threshold: 20.0
+    sensitivity: 0.4
+    alert-threshold: 5.0
+    setback-threshold: 10.0
+    punishment-threshold: 25.0
 
   phase:
     enabled: true
-    sensitivity: 0.5
-    alert-threshold: 4.0
-    setback-threshold: 8.0
-    punishment-threshold: 20.0
+    sensitivity: 0.4
+    alert-threshold: 5.0
+    setback-threshold: 10.0
+    punishment-threshold: 25.0
 
   rotation:
     enabled: true
-    sensitivity: 0.5
-    alert-threshold: 5.0
-    setback-threshold: 10.0
-    punishment-threshold: 25.0
-    max-delta-yaw: 180.0
+    sensitivity: 0.4
+    alert-threshold: 6.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
 
   freecam:
     enabled: true
-    sensitivity: 0.5
-    alert-threshold: 5.0
-    setback-threshold: 10.0
-    punishment-threshold: 25.0
-    max-distance: 12.0
+    sensitivity: 0.4
+    alert-threshold: 6.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
