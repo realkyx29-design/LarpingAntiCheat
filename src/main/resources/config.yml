@@ -1,0 +1,47 @@
+# LarpingAntiCheat - observe in production before enabling punishments.
+alerts: true
+debug: false
+exempt-permission: lac.bypass
+violation-decay-per-second: 0.15
+ping-compensation: true
+tps-compensation: true
+graces:
+  teleport-ticks: 30
+  velocity-ticks: 12
+  damage-ticks: 8
+checks:
+  sensitivity: 1.0
+  movement: true
+  combat: true
+  interaction: true
+  speed:
+    enabled: true
+    max-horizontal-per-tick: 0.72
+    min-confirmations: 4
+  fly:
+    enabled: true
+    air-ticks: 35
+    min-confirmations: 5
+  reach:
+    enabled: true
+    max-distance: 3.45
+  autoclicker:
+    enabled: true
+    min-samples: 40
+    max-cps: 18
+  scaffold:
+    enabled: true
+    min-placements: 6
+punishments:
+  enabled: false
+  actions:
+    - threshold: 20
+      command: "kick %player% Suspicious behavior"
+    - threshold: 50
+      command: "ban %player% Cheating"
+setbacks:
+  enabled: false
+  threshold: 8
+logging:
+  enabled: false
+  include-location: true
