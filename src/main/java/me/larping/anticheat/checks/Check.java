@@ -2,7 +2,10 @@ package me.larping.anticheat.checks;
 
 import org.bukkit.entity.Player;
 
-/** A small extension point for server-observable checks. Checks must be conservative. */
+/**
+ * Interface representing an observable check in LarpingAntiCheat.
+ * Designed to be modular, conservative, and compatible with custom SMP mechanics.
+ */
 public interface Check {
     String name();
     boolean enabled();

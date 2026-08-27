@@ -4,13 +4,22 @@ main: me.larping.anticheat.LarpingAntiCheat
 api-version: '1.21'
 author: Larping
 website: https://github.com/realkyx29-design/LarpingAntiCheat
-description: Evidence-based, server-side anti-cheat for Paper SMP servers.
+description: Conservative, production-ready anti-cheat for Paper 1.21.11 custom SMP servers with very low false positives.
 commands:
   lac:
-    description: LarpingAntiCheat administration
-    usage: /lac <alerts|info|violations|clear|reload|debug|checks|enable|disable>
+    description: LarpingAntiCheat administration and check management
+    usage: /lac <checks|enable|disable|reload|debug|alerts|info|violations|clear>
     permission: lac.admin
 permissions:
-  lac.admin: {default: op}
-  lac.alerts: {default: op}
-  lac.bypass: {default: false}
+  lac.admin:
+    description: Full administration access for LarpingAntiCheat
+    default: op
+  lac.alerts:
+    description: Receive anti-cheat alert broadcasts
+    default: op
+  lac.bypass:
+    description: Bypass anti-cheat checks entirely
+    default: false
+  lac.debug:
+    description: View check debug information for players
+    default: op
