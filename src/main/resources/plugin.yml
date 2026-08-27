@@ -1,0 +1,16 @@
+name: LarpingAntiCheat
+version: 1.0.0
+main: me.larping.anticheat.LarpingAntiCheat
+api-version: '1.21'
+author: Larping
+website: https://github.com/realkyx29-design/LarpingAntiCheat
+description: Evidence-based, server-side anti-cheat for Paper SMP servers.
+commands:
+  lac:
+    description: LarpingAntiCheat administration
+    usage: /lac <alerts|info|violations|clear|reload|debug|checks|enable|disable>
+    permission: lac.admin
+permissions:
+  lac.admin: {default: op}
+  lac.alerts: {default: op}
+  lac.bypass: {default: false}
