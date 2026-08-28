@@ -1,5 +1,5 @@
 # =====================================================================
-# LarpingAntiCheat - Configuration
+# Hyphon - Configuration
 # Paper 1.21+ anti-cheat for custom SMP servers.
 #
 # Checks use server-side physics + block collision shapes, so they
@@ -18,7 +18,7 @@ alerts:
   # Staff alerts are hoverable: hover over an alert for the full debug box
   # (category, VL, confidence, ping, TPS, location, offsets). Every flag is
   # also written to the console/log in full detail.
-  format: "&c[LAC] &f%player% &7failed &f%check% &7(VL &c%vl%&7, ping &e%ping%ms&7, tps &e%tps%&7)"
+  format: "&c[Hyphon] &f%player% &7failed &f%check% &7(VL &c%vl%&7, ping &e%ping%ms&7, tps &e%tps%&7)"
 
 logging:
   enabled: false
@@ -221,6 +221,45 @@ checks:
     # custom-modifier provider, so legitimately strong weapons never flag.
     damage-headroom: 4
     min-confirmations: 3
+
+  boatfly:
+    enabled: true
+    sensitivity: 0.55
+    alert-threshold: 6.0
+    setback-threshold: 10.0
+    punishment-threshold: 25.0
+    # Ticks a boat may stay unsupported (no water/ground) before boat-fly.
+    min-supported-air-ticks: 8
+    min-confirmations: 8
+
+  autototem:
+    enabled: true
+    sensitivity: 0.5
+    alert-threshold: 6.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    # Reaction time (ms) below which a totem re-swap is sub-human. Accounts
+    # for ping/TPS; single fast swaps never flag.
+    reaction-ms: 60
+    min-confirmations: 5
+
+  autocrystal:
+    enabled: true
+    sensitivity: 0.5
+    alert-threshold: 7.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    # Max eye-to-crystal distance for place/break (survival interaction).
+    max-reach: 6.0
+    min-confirmations: 8
+
+  autoweb:
+    enabled: true
+    sensitivity: 0.5
+    alert-threshold: 6.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    min-confirmations: 6
 
   # ----------------------------------------------------------------
   # World / interaction

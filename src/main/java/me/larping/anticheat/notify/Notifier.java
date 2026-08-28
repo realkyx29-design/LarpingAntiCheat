@@ -32,7 +32,7 @@ import java.lang.reflect.Method;
  */
 public final class Notifier {
 
-    public static final String PREFIX = "§8[§c§lLAC§8]§r ";
+    public static final String PREFIX = "§8[§c§lHyphon§8]§r ";
 
     private final LarpingAntiCheat plugin;
     private final boolean hoverAvailable;
@@ -70,7 +70,7 @@ public final class Notifier {
         String world = l.getWorld() != null ? l.getWorld().getName() : "?";
 
         String hover = String.join("\n",
-                "§c§lLAC §7v" + plugin.getDescription().getVersion(),
+                "§c§lHyphon §7v" + plugin.getDescription().getVersion(),
                 "",
                 "§7Player: §f" + name + " §8(" + world + ")",
                 "§7Check: §f" + check + " §8(" + type + ")",
@@ -117,7 +117,7 @@ public final class Notifier {
 
     /** Verbose flag feed for staff tracking a player/check. */
     public void debug(Player target, String check, double vl, String detail) {
-        String msg = "§8[§cLAC debug§8] §7" + check + " §f" + target.getName()
+        String msg = "§8[§cHyphon debug§8] §7" + check + " §f" + target.getName()
                 + " §7VL=" + String.format("%.1f", vl) + " §8| §7" + detail;
         for (Player staff : Bukkit.getOnlinePlayers()) {
             if (staff.hasPermission("lac.verbose") && !staff.equals(target)) {
@@ -143,7 +143,7 @@ public final class Notifier {
             if (console == null) return;
             String[] lines = {
                     "§8§m--------------------------------------------",
-                    PREFIX + "§cLarpingAntiCheat §7v" + v,
+                    PREFIX + "§cHyphon §7v" + v,
                     "§7Server-authoritative anti-cheat for Paper 1.21+",
                     "§7" + checkCount + " checks active §8• §7enforcement §aenabled",
                     "§7Bypass §flac.bypass §8• §7alerts §flac.alerts §8• §7verbose §flac.verbose",

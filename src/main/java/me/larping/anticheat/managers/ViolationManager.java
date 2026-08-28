@@ -66,8 +66,8 @@ public final class ViolationManager {
                        double amount, double confidence, String detail, Setback setback) {
         ConfigManager.Snapshot cfg = plugin.configManager().get();
 
-        // Exempt players (staff / bypass permission) never accrue VL.
-        if (player.hasPermission(cfg.exemptPermission())) {
+        // Exempt players never accrue VL: live OP whitelist and bypass nodes.
+        if (isExempt(player, cfg)) {
             return 0.0;
         }
 
@@ -132,6 +132,7 @@ public final class ViolationManager {
      * recently requested AND the per-player cooldown allows it.
      */
     public boolean shouldCorrectMovement(Player player) {
+        if (isExempt(player, plugin.configManager().get())) return false;
         if (!plugin.configManager().get().setbacksEnabled()) return false;
         PlayerData data = plugin.data(player);
         return data.consumeMovementCorrection(plugin.configManager().get().setbackCooldownMs());
@@ -158,9 +159,26 @@ public final class ViolationManager {
 
     /** Current VL for a single check (0 if none). Used by enforcement gates. */
     public double checkVl(Player player, String check) {
+        if (isExempt(player, plugin.configManager().get())) return 0.0;
         Map<String, Double> map = violationsMap.get(player.getUniqueId());
         if (map == null) return 0.0;
         return map.getOrDefault(check, 0.0);
+    }
+
+    /**
+     * Dynamic exemption: live server-operator state plus the bypass permission
+     * nodes. OPs never get VL, setbacks, alerts, or automatic punishments.
+     */
+    private boolean isExempt(Player player, ConfigManager.Snapshot cfg) {
+        try {
+            if (player.isOp()) return true;
+        } catch (Throwable ignored) { }
+        try {
+            String node = cfg.exemptPermission();
+            if (node != null && player.hasPermission(node)) return true;
+            if (player.hasPermission("hyphon.bypass") || player.hasPermission("lac.bypass")) return true;
+        } catch (Throwable ignored) { }
+        return false;
     }
 
     public double total(Player player) {

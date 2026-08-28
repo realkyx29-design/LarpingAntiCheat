@@ -63,11 +63,35 @@ public final class CheckContext {
      * They are compensated individually by the movement checks instead.
      */
     public boolean isFullyExempt() {
+        // Dynamic OP whitelist: read live server-operator state every time, so
+        // a player who gains OP is immediately exempt and one who loses it is
+        // immediately protected again. OPs accrue no VL, no setbacks, no bans.
+        if (isOp(player)) return true;
+
         GameMode gm = player.getGameMode();
         if (gm == GameMode.SPECTATOR || gm == GameMode.CREATIVE) return true;
         if (player.isDead() || !player.isValid()) return true;
-        if (player.hasPermission(cfg().exemptPermission())) return true;
+        // Both the new hyphon.bypass and legacy lac.bypass nodes.
+        if (hasAny(player, cfg().exemptPermission(), "hyphon.bypass", "lac.bypass")) return true;
         return data.inHardGrace();
+    }
+
+    private static boolean isOp(Player player) {
+        try {
+            return player.isOp();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private static boolean hasAny(Player player, String... nodes) {
+        for (String node : nodes) {
+            if (node == null || node.isEmpty()) continue;
+            try {
+                if (player.hasPermission(node)) return true;
+            } catch (Throwable ignored) { }
+        }
+        return false;
     }
 
     /** Movement checks additionally skip vehicles and server-granted flight. */

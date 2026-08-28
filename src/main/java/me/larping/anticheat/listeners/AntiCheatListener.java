@@ -227,6 +227,7 @@ public final class AntiCheatListener implements Listener {
         checks.get("groundspoof").evaluate(ctx);
         checks.get("phase").evaluate(ctx);
         checks.get("noknockback").evaluate(ctx);
+        checks.boatFly().evaluate(ctx);
 
         // --- Server-authoritative movement enforcement ---------------
         // If a high-confidence, sustained movement check fired (blink /
@@ -253,9 +254,12 @@ public final class AntiCheatListener implements Listener {
 
     /** Quick gate before building/evaluating checks: creative/dead/bypass handled here. */
     private boolean passes(Player player) {
+        // Dynamic OP whitelist — OPs are never processed by checks.
+        try { if (player.isOp()) return false; } catch (Throwable ignored) { }
         if (player.getGameMode() == GameMode.CREATIVE) return false;
         if (player.isDead() || !player.isValid()) return false;
         if (player.hasPermission(plugin.configManager().get().exemptPermission())) return false;
+        if (player.hasPermission("hyphon.bypass") || player.hasPermission("lac.bypass")) return false;
         return true;
     }
 
@@ -309,9 +313,20 @@ public final class AntiCheatListener implements Listener {
         CheckContext ctx = new CheckContext(plugin, player, data);
         checks.scaffold().evaluatePlace(player, event.getBlockPlaced(), ctx);
 
+        // Automation validation for special blocks.
+        Material placedType = event.getBlockPlaced() != null
+                ? event.getBlockPlaced().getType() : null;
+        if (placedType == Material.COBWEB) {
+            checks.autoWeb().evaluateWebPlacement(player, event.getBlockPlaced(), ctx);
+        } else if (placedType == Material.END_CRYSTAL) {
+            // Crystal placed on obsidian for combat — AutoCrystal place signal.
+            checks.autoCrystal().recordCrystalPlace(ctx,
+                    event.getBlockPlaced().getLocation().add(0.5, 0.5, 0.5));
+        }
+
         // Illegal placements (out-of-reach / far too fast) are denied.
         if (plugin.configManager().get().enforceCancelBlocks()
-                && plugin.violations().shouldCancelEvent(player, "Scaffold")) {
+                && plugin.violations().shouldCancelEvent(player, "Scaffold", "AutoWeb", "AutoCrystal")) {
             event.setCancelled(true);
         }
     }

@@ -159,6 +159,7 @@ public final class PlayerData {
     private double jesusBuffer, spiderBuffer, stepBuffer, blinkBuffer;
     private double fastPlaceBuffer, fastBreakBuffer, nukerBuffer;
     private double reachBuffer, auraBuffer, weaponDamageBuffer, groundSpoofBuffer;
+    private double boatFlyBuffer, autoTotemBuffer, autoCrystalBuffer, autoWebBuffer;
     private int timerFastWindows;
 
     public double buffer(String key) {
@@ -178,6 +179,10 @@ public final class PlayerData {
             case "reach" -> reachBuffer;
             case "killaura" -> auraBuffer;
             case "weapondamage" -> weaponDamageBuffer;
+            case "boatfly" -> boatFlyBuffer;
+            case "autototem" -> autoTotemBuffer;
+            case "autocrystal" -> autoCrystalBuffer;
+            case "autoweb" -> autoWebBuffer;
             case "groundspoof" -> groundSpoofBuffer;
             default -> 0.0;
         };
@@ -202,6 +207,10 @@ public final class PlayerData {
             case "reach" -> reachBuffer = v;
             case "killaura" -> auraBuffer = v;
             case "weapondamage" -> weaponDamageBuffer = v;
+            case "boatfly" -> boatFlyBuffer = v;
+            case "autototem" -> autoTotemBuffer = v;
+            case "autocrystal" -> autoCrystalBuffer = v;
+            case "autoweb" -> autoWebBuffer = v;
             case "groundspoof" -> groundSpoofBuffer = v;
             default -> { }
         }
@@ -213,6 +222,7 @@ public final class PlayerData {
         jesusBuffer = spiderBuffer = stepBuffer = blinkBuffer = 0;
         fastPlaceBuffer = fastBreakBuffer = nukerBuffer = 0;
         reachBuffer = auraBuffer = weaponDamageBuffer = groundSpoofBuffer = 0;
+        boatFlyBuffer = autoTotemBuffer = autoCrystalBuffer = autoWebBuffer = 0;
         timerBalance = timerBurst = 0;
         timerFastWindows = 0;
     }
@@ -237,6 +247,54 @@ public final class PlayerData {
     public int smoothPing() {
         return smoothPing;
     }
+
+    // ---- Boat / vehicle flight tracking (driven by BoatFlyCheck) ----
+    private double lastVehicleY = Double.NaN;
+    private int vehicleAirTicks = 0;
+    private double vehicleDeltaY = 0.0;
+
+    public void updateVehicle(double y, boolean nearLiquid) {
+        if (!Double.isNaN(lastVehicleY)) {
+            vehicleDeltaY = y - lastVehicleY;
+        } else {
+            vehicleDeltaY = 0.0;
+        }
+        // Boats on water bob; genuine boats over open air fall. Boat-fly holds
+        // altitude or climbs without liquid/slope, so only count air far from water.
+        if (!nearLiquid && vehicleDeltaY >= -0.02) vehicleAirTicks++;
+        else vehicleAirTicks = 0;
+        lastVehicleY = y;
+    }
+    public void resetVehicle() {
+        lastVehicleY = Double.NaN;
+        vehicleAirTicks = 0;
+        vehicleDeltaY = 0.0;
+    }
+    public int vehicleAirTicks() { return vehicleAirTicks; }
+    public double vehicleDeltaY() { return vehicleDeltaY; }
+
+    // ---- AutoTotem tracking ----
+    private long lastOffhandSwapMs = 0L;
+    private int emergencyTotemSwaps = 0;
+    private long lastTotemWindowMs = 0L;
+    public void recordOffhandSwap() {
+        long now = System.currentTimeMillis();
+        lastOffhandSwapMs = now;
+        if (now - lastTotemWindowMs > 4000L) { emergencyTotemSwaps = 0; lastTotemWindowMs = now; }
+        emergencyTotemSwaps++;
+    }
+    public long millisSinceOffhandSwap() {
+        return lastOffhandSwapMs == 0L ? Long.MAX_VALUE : System.currentTimeMillis() - lastOffhandSwapMs;
+    }
+    public int emergencyTotemSwaps() { return emergencyTotemSwaps; }
+
+    // ---- Generic recent-action timestamp (combat place/break timing) ----
+    private long lastActionMs = 0L;
+    public void recordActionNow() { this.lastActionMs = System.currentTimeMillis(); }
+    public long millisSinceLastAction() {
+        return lastActionMs == 0L ? Long.MAX_VALUE : System.currentTimeMillis() - lastActionMs;
+    }
+
 
     public double timerBalance() { return timerBalance; }
     public void timerBalance(double v) { this.timerBalance = v; }

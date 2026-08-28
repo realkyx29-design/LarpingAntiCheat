@@ -23,6 +23,15 @@ import java.util.stream.Stream;
  * registry, so new checks appear automatically without hardcoded lists.
  */
 public final class LacCommand implements CommandExecutor, TabCompleter {
+    private boolean admin(CommandSender s) {
+        if (s.isOp()) return true;
+        return s.hasPermission("hyphon.admin") || s.hasPermission("lac.admin");
+    }
+    private boolean debugPerm(CommandSender s) {
+        if (s.isOp()) return true;
+        return s.hasPermission("hyphon.debug") || s.hasPermission("lac.debug");
+    }
+
 
     private final LarpingAntiCheat plugin;
 
@@ -38,13 +47,13 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!sender.hasPermission("lac.admin")) {
-            sender.sendMessage("§cYou do not have permission to use LarpingAntiCheat.");
+        if (!admin(sender)) {
+            sender.sendMessage("§cYou do not have permission to use Hyphon.");
             return true;
         }
 
         if (args.length == 0) {
-            sender.sendMessage("§8[§cLAC§8] §7LarpingAntiCheat v" + plugin.getDescription().getVersion());
+            sender.sendMessage("§8[§cHyphon§8] §7Hyphon v" + plugin.getDescription().getVersion());
             sender.sendMessage("§7Usage: §f/lac <checks|enable|disable|reload|alerts|violations|clear|debug>");
             return true;
         }
@@ -53,7 +62,7 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
 
         switch (sub) {
             case "checks" -> {
-                sender.sendMessage("§8[§cLAC§8] §eActive checks:");
+                sender.sendMessage("§8[§cHyphon§8] §eActive checks:");
                 for (Check c : plugin.checkManager().all()) {
                     CheckConfig cc = plugin.configManager().get().check(c.name());
                     sender.sendMessage("§7 - §f" + c.name()
@@ -76,19 +85,19 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
                 plugin.getConfig().set("checks." + name + ".enabled", enable);
                 plugin.saveConfig();
                 plugin.configManager().reload();
-                sender.sendMessage("§8[§cLAC§8] Check §f" + name + " §7is now "
+                sender.sendMessage("§8[§cHyphon§8] Check §f" + name + " §7is now "
                         + (enable ? "§aenabled" : "§cdisabled") + "§7.");
             }
             case "reload" -> {
                 plugin.configManager().reload();
-                sender.sendMessage("§8[§cLAC§8] §aConfiguration reloaded.");
+                sender.sendMessage("§8[§cHyphon§8] §aConfiguration reloaded.");
             }
             case "alerts" -> {
                 boolean now = !plugin.configManager().isAlertsEnabled();
                 plugin.getConfig().set("alerts.enabled", now);
                 plugin.saveConfig();
                 plugin.configManager().reload();
-                sender.sendMessage("§8[§cLAC§8] Alerts are now "
+                sender.sendMessage("§8[§cHyphon§8] Alerts are now "
                         + (now ? "§aENABLED" : "§cDISABLED") + ".");
             }
             case "violations", "info" -> {
@@ -103,7 +112,7 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
                 }
                 Map<String, Double> breakdown = plugin.violations().getViolations(target);
                 double total = plugin.violations().total(target);
-                sender.sendMessage("§8[§cLAC§8] §e" + target.getName()
+                sender.sendMessage("§8[§cHyphon§8] §e" + target.getName()
                         + " §7total VL: §c" + String.format("%.1f", total));
                 if (breakdown.isEmpty()) {
                     sender.sendMessage("§7No violations.");
@@ -126,10 +135,10 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
                 }
                 plugin.violations().clear(target);
                 plugin.data(target).resetBuffers();
-                sender.sendMessage("§8[§cLAC§8] §aCleared violations for §f" + target.getName() + "§a.");
+                sender.sendMessage("§8[§cHyphon§8] §aCleared violations for §f" + target.getName() + "§a.");
             }
             case "debug" -> {
-                if (!sender.hasPermission("lac.debug")) {
+                if (!debugPerm(sender)) {
                     sender.sendMessage("§cYou do not have permission for debug mode.");
                     return true;
                 }
@@ -146,7 +155,7 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
                 String check = args[2].toLowerCase();
                 if (check.equals("off")) {
                     data.setDebug("all", false);
-                    sender.sendMessage("§8[§cLAC§8] Debug disabled for §f" + target.getName() + "§7.");
+                    sender.sendMessage("§8[§cHyphon§8] Debug disabled for §f" + target.getName() + "§7.");
                 } else {
                     boolean off = data.isDebugging(check);
                     if (!check.equals("all")) {
@@ -154,7 +163,7 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
                     } else {
                         data.setDebug("all", !off);
                     }
-                    sender.sendMessage("§8[§cLAC§8] Debug §f" + check + " §7on §f" + target.getName()
+                    sender.sendMessage("§8[§cHyphon§8] Debug §f" + check + " §7on §f" + target.getName()
                             + " §7is now " + (off ? "§cOFF" : "§aON") + ".");
                 }
             }
@@ -165,7 +174,7 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (!sender.hasPermission("lac.admin")) return List.of();
+        if (!admin(sender)) return List.of();
 
         if (args.length == 1) {
             return Stream.of("checks", "enable", "disable", "reload", "alerts",

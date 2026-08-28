@@ -1,28 +1,48 @@
-name: LarpingAntiCheat
+name: Hyphon
 version: 1.0.0
 main: me.larping.anticheat.LarpingAntiCheat
 api-version: '1.21'
 author: Larping
 website: https://github.com/realkyx29-design/LarpingAntiCheat
-description: Production-ready anti-cheat for Paper 1.21.11 custom SMP servers, focusing on blocking cheat clients and exploits.
+description: Hyphon — advanced, custom-mechanic-aware anti-cheat for Paper 1.21+ servers.
 commands:
   lac:
-    description: LarpingAntiCheat administration and check management
+    description: Hyphon administration and check management
     usage: /lac <checks|enable|disable|reload|alerts|violations|clear|debug>
-    permission: lac.admin
+    permission: hyphon.admin
+    aliases: [hyphon]
 permissions:
+  hyphon.admin:
+    description: Full administration access for Hyphon
+    default: op
   lac.admin:
-    description: Full administration access for LarpingAntiCheat
+    description: Backwards-compatible alias for hyphon.admin
+    default: op
+    children:
+      hyphon.admin: true
+  hyphon.alerts:
+    description: Receive Hyphon alert broadcasts
     default: op
   lac.alerts:
-    description: Receive anti-cheat alert broadcasts
+    description: Backwards-compatible alias for hyphon.alerts
     default: op
-  lac.bypass:
-    description: Bypass anti-cheat checks entirely
+    children:
+      hyphon.alerts: true
+  hyphon.bypass:
+    description: Bypass Hyphon checks entirely (also granted automatically to OPs)
     default: false
-  lac.debug:
-    description: View check debug information for players
-    default: op
-  lac.verbose:
+  lac.bypass:
+    description: Backwards-compatible alias for hyphon.bypass
+    default: false
+  hyphon.verbose:
     description: Receive the detailed verbose/debug feed and setback notices
     default: false
+  lac.verbose:
+    description: Backwards-compatible alias for hyphon.verbose
+    default: false
+  hyphon.debug:
+    description: View Hyphon debug information for players
+    default: op
+  lac.debug:
+    description: Backwards-compatible alias for hyphon.debug
+    default: op

@@ -3,8 +3,11 @@ package me.larping.anticheat.managers;
 import me.larping.anticheat.checks.Check;
 import me.larping.anticheat.checks.combat.KillAuraCheck;
 import me.larping.anticheat.checks.combat.ReachCheck;
+import me.larping.anticheat.checks.combat.AutoTotemCheck;
+import me.larping.anticheat.checks.combat.AutoCrystalCheck;
 import me.larping.anticheat.checks.combat.WeaponDamageCheck;
 import me.larping.anticheat.checks.movement.BlinkCheck;
+import me.larping.anticheat.checks.movement.BoatFlyCheck;
 import me.larping.anticheat.checks.movement.FlyCheck;
 import me.larping.anticheat.checks.movement.GroundSpoofCheck;
 import me.larping.anticheat.checks.movement.JesusCheck;
@@ -17,6 +20,7 @@ import me.larping.anticheat.checks.movement.StepCheck;
 import me.larping.anticheat.checks.movement.TimerCheck;
 import me.larping.anticheat.checks.world.FastBreakCheck;
 import me.larping.anticheat.checks.world.NukerCheck;
+import me.larping.anticheat.checks.world.AutoWebCheck;
 import me.larping.anticheat.checks.world.ScaffoldCheck;
 
 import java.util.Collection;
@@ -38,6 +42,10 @@ public final class CheckManager {
     private final ReachCheck reach;
     private final KillAuraCheck killAura;
     private final WeaponDamageCheck weaponDamage;
+    private final BoatFlyCheck boatFly;
+    private final AutoTotemCheck autoTotem;
+    private final AutoCrystalCheck autoCrystal;
+    private final AutoWebCheck autoWeb;
     private final ScaffoldCheck scaffold;
     private final FastBreakCheck fastBreak;
     private final NukerCheck nuker;
@@ -57,6 +65,10 @@ public final class CheckManager {
         reach = register(new ReachCheck());
         killAura = register(new KillAuraCheck());
         weaponDamage = register(new WeaponDamageCheck());
+        boatFly = register(new BoatFlyCheck());
+        autoTotem = register(new AutoTotemCheck());
+        autoCrystal = register(new AutoCrystalCheck());
+        autoWeb = register(new AutoWebCheck());
         scaffold = register(new ScaffoldCheck());
         fastBreak = register(new FastBreakCheck());
         nuker = register(new NukerCheck());
@@ -79,6 +91,10 @@ public final class CheckManager {
     public ReachCheck reach() { return reach; }
     public KillAuraCheck killAura() { return killAura; }
     public WeaponDamageCheck weaponDamage() { return weaponDamage; }
+    public BoatFlyCheck boatFly() { return boatFly; }
+    public AutoTotemCheck autoTotem() { return autoTotem; }
+    public AutoCrystalCheck autoCrystal() { return autoCrystal; }
+    public AutoWebCheck autoWeb() { return autoWeb; }
     public ScaffoldCheck scaffold() { return scaffold; }
     public FastBreakCheck fastBreak() { return fastBreak; }
     public NukerCheck nuker() { return nuker; }

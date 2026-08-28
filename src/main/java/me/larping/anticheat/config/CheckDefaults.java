@@ -43,6 +43,10 @@ public final class CheckDefaults {
     public static final String REACH = "reach";
     public static final String KILL_AURA = "killaura";
     public static final String WEAPON_DAMAGE = "weapondamage";
+    public static final String BOAT_FLY = "boatfly";
+    public static final String AUTO_TOTEM = "autototem";
+    public static final String AUTO_CRYSTAL = "autocrystal";
+    public static final String AUTO_WEB = "autoweb";
     public static final String SCAFFOLD = "scaffold";
     public static final String FAST_BREAK = "fastbreak";
     public static final String NUKER = "nuker";
@@ -90,6 +94,15 @@ public final class CheckDefaults {
         // the check flags large spikes and cancels only sustained over-damage.
         put(WEAPON_DAMAGE, 0.60, 8.0, 12.0, 30.0,
                 t("damage-headroom", 4.0), t("min-confirmations", 3.0));
+        // Exploit / automation checks (multi-signal, high confirm thresholds).
+        put(BOAT_FLY, 0.55, 6.0, 10.0, 25.0,
+                t("min-supported-air-ticks", 8.0), t("min-confirmations", 8.0));
+        put(AUTO_TOTEM, 0.50, 6.0, 12.0, 30.0,
+                t("reaction-ms", 60.0), t("min-confirmations", 5.0));
+        put(AUTO_CRYSTAL, 0.50, 7.0, 12.0, 30.0,
+                t("max-reach", 6.0), t("min-confirmations", 8.0));
+        put(AUTO_WEB, 0.50, 6.0, 12.0, 30.0,
+                t("min-confirmations", 6.0), t("min-confirmations", 6.0));
         put(SCAFFOLD, 0.60, 5.0, 12.0, 30.0,
                 t("max-placements-per-sec", 14.0), t("max-reach", 4.5), t("min-confirmations", 4.0));
         put(FAST_BREAK, 0.60, 5.0, 12.0, 30.0,
