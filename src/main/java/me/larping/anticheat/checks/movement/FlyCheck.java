@@ -34,8 +34,12 @@ public final class FlyCheck extends MovementCheck {
 
         // --- Fully legitimate flight / airborne states, never flag ---
         var caps = ctx.data().capabilities();
-        // Creative flight, server-granted (donor/plugin) flight, spectator.
-        if (caps != null && (caps.allowedFlight || caps.flying)) { decay(ctx); return; }
+        // Only SERVER-GRANTED flight is allowed (creative/spectator/donor with
+        // getAllowFlight true). A survival fly hack has isFlying() true but
+        // getAllowFlight() false — that must NOT exempt.
+        boolean serverFlight = (caps != null && caps.allowedFlight)
+                || CheckContext.serverAllowsFlight(ctx.player());
+        if (serverFlight) { decay(ctx); return; }
         // Elytra gliding is its own movement model and is always allowed.
         if (s.gliding || (caps != null && caps.gliding)) { decay(ctx); return; }
         // Levitation / riptide are legitimate upward motion.

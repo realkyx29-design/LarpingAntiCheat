@@ -44,20 +44,23 @@ grace-periods:
 # triggers on SUSTAINED, high-confidence violations (well past the alert
 # thresholds), so legitimate play is never cancelled or snapped back.
 setbacks:
-  # Detection is LOG-ONLY by default: no teleports, kicks or bans. Set these
-  # to true only once you are confident thresholds are tuned for your server.
-  enabled: false
+  # Setbacks ONLY trigger on high-confidence, sustained impossible movement
+  # (e.g. survival fly). Creative/spectator/OP/custom-gear players never get
+  # set back. This is not a kick or ban — it snaps an illegal move back.
+  enabled: true
   # Minimum milliseconds between two setbacks for the same player
   # (prevents rubber-band loops).
   cooldown-ms: 1200
 
 enforcement:
-  # Hyphon is LOG-ONLY by default: it never cancels, teleports, kicks or bans.
-  # Set any of these to true to actively block the action once tuned.
-  cancel-attacks: false
-  cancel-blocks: false
-  cancel-breaks: false
-  correct-movement: false
+  # High-confidence enforcement. Impossible out-of-reach/instamine block breaks
+  # (nuker) and impossible flight are blocked; legit custom pickaxe area-mining
+  # and fast-but-valid play are never affected.
+  cancel-attacks: true
+  cancel-blocks: true
+  cancel-breaks: true
+  # Set back (snap) players doing impossible unauthorized flight.
+  correct-movement: true
 
 punishments:
   enabled: false

@@ -94,12 +94,30 @@ public final class CheckContext {
         return false;
     }
 
-    /** Movement checks additionally skip vehicles and server-granted flight. */
+    /** Movement checks additionally skip vehicles and <b>server-granted</b>
+     *  flight. A player who is flying WITHOUT server permission (survival
+     *  fly hack: isFlying() true but getAllowFlight() false) is NOT exempt —
+     *  that is the exact unauthorized flight the Fly check must catch. */
     public boolean isMovementExempt() {
         if (isFullyExempt()) return true;
         if (player.isInsideVehicle()) return true;
-        if (player.isFlying()) return true; // server-authoritative flight (donor/creative)
+        try {
+            // Only legitimate flight (creative/spectator/donor/plugin-granted)
+            // is exempt. Flying without the server allowing it is a cheat.
+            if (player.isFlying() && serverAllowsFlight(player)) return true;
+        } catch (Throwable ignored) { }
         return false;
+    }
+
+    /** True when the server actually permits flight (not a client fly hack). */
+    public static boolean serverAllowsFlight(Player player) {
+        try {
+            if (player.getAllowFlight()) return true;
+            GameMode gm = player.getGameMode();
+            return gm == GameMode.CREATIVE || gm == GameMode.SPECTATOR;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     /**
