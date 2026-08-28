@@ -15,6 +15,9 @@ alerts:
   enabled: true
   # Rate limit per player+check (milliseconds) to prevent alert spam.
   cooldown-ms: 1500
+  # Staff alerts are hoverable: hover over an alert for the full debug box
+  # (category, VL, confidence, ping, TPS, location, offsets). Every flag is
+  # also written to the console/log in full detail.
   format: "&c[LAC] &f%player% &7failed &f%check% &7(VL &c%vl%&7, ping &e%ping%ms&7, tps &e%tps%&7)"
 
 logging:

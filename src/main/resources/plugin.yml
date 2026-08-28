@@ -23,3 +23,6 @@ permissions:
   lac.debug:
     description: View check debug information for players
     default: op
+  lac.verbose:
+    description: Receive the detailed verbose/debug feed and setback notices
+    default: false

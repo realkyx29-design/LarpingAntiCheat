@@ -7,6 +7,7 @@ import me.larping.anticheat.data.PlayerData;
 import me.larping.anticheat.listeners.AntiCheatListener;
 import me.larping.anticheat.managers.CheckManager;
 import me.larping.anticheat.managers.ViolationManager;
+import me.larping.anticheat.notify.Notifier;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -36,6 +37,7 @@ public final class LarpingAntiCheat extends JavaPlugin {
     private ConfigManager configManager;
     private ViolationManager violationManager;
     private CheckManager checkManager;
+    private Notifier notifier;
 
     private volatile double currentTps = 20.0;
 
@@ -43,6 +45,7 @@ public final class LarpingAntiCheat extends JavaPlugin {
     public void onEnable() {
         this.configManager = new ConfigManager(this);
         this.violationManager = new ViolationManager(this);
+        this.notifier = new Notifier(this);
         this.checkManager = new CheckManager();
 
         getServer().getPluginManager().registerEvents(new AntiCheatListener(this), this);
@@ -72,8 +75,7 @@ public final class LarpingAntiCheat extends JavaPlugin {
             }
         }, 20L, 20L);
 
-        getLogger().info("LarpingAntiCheat v" + getDescription().getVersion()
-                + " enabled — " + checkManager.all().size() + " checks active (Paper 1.21 / Java 21).");
+        notifier.banner(checkManager.all().size());
     }
 
     /** Runs once per server tick on the main thread. */
@@ -119,6 +121,10 @@ public final class LarpingAntiCheat extends JavaPlugin {
 
     public CheckManager checkManager() {
         return checkManager;
+    }
+
+    public Notifier notifier() {
+        return notifier;
     }
 
     public double tps() {

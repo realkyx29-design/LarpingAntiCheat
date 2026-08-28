@@ -80,52 +80,50 @@ public final class ViolationManager {
         double weight = amount * (0.5 + cc.sensitivity() * 0.5);
         double total = playerVl.merge(checkName, weight, (a, b) -> Math.min(100.0, a + b));
 
-        // --- Logging -----------------------------------------------------
-        if (cfg.loggingEnabled()) {
-            String loc = "";
-            if (cfg.logLocation()) {
-                Location l = player.getLocation();
-                loc = String.format(" @ %.0f,%.0f,%.0f %s", l.getX(), l.getY(), l.getZ(),
-                        l.getWorld() != null ? l.getWorld().getName() : "?");
-            }
-            plugin.getLogger().warning("[LAC] " + player.getName() + " failed " + checkName
-                    + " (" + checkType + ") VL=" + String.format("%.1f", total)
-                    + " conf=" + (int) (confidence * 100) + "%" + loc + " - " + detail);
-        }
-
-        // --- Debug feed ---------------------------------------------------
         PlayerData data = plugin.data(player);
+
+        // --- Verbose debug feed (players tracking this check) -----------
         if (data.isDebugging(checkName)) {
-            player.sendMessage("§8[§cLAC debug§8] §7" + checkName + " §fVL="
-                    + String.format("%.1f", total) + " §7" + detail);
+            plugin.notifier().debug(player, checkName, total, detail);
         }
 
-        // --- Alerts (rate-limited, threshold-gated) -----------------------
+        // --- Movement correction decision ------------------------------
+        boolean correcting = setback == Setback.MOVEMENT && cfg.setbacksEnabled()
+                && total >= cc.setbackThreshold() && confidence >= 0.75;
+        if (correcting) {
+            data.markMovementCorrection();
+        }
+
+        // --- Alerts / detailed console log ------------------------------
+        // Every flag above the alert threshold produces a rate-limited,
+        // hoverable chat alert plus a full-detail console record; below the
+        // threshold it is still logged to console when logging is enabled.
         if (cfg.alertsEnabled() && total >= cc.alertThreshold() && confidence >= 0.6) {
             String key = player.getUniqueId() + ":" + checkName;
             long now = System.currentTimeMillis();
             Long last = lastAlertMs.get(key);
             if (last == null || now - last >= cfg.alertCooldownMs()) {
                 lastAlertMs.put(key, now);
-                broadcastAlert(cfg, player, checkName, total, confidence);
+                plugin.notifier().alert(player, checkName, checkType, categoryFor(checkName),
+                        total, confidence, detail, correcting);
             }
-        }
-
-        // --- Movement correction ----------------------------------------
-        // Instead of a hard teleport (which rubber-bands legit players and
-        // can be glitchy), the listener asks whether the current move should
-        // be rejected. That decision is high-confidence and rate-limited; the
-        // listener applies it with PlayerMoveEvent.setTo to a previously
-        // server-valid position. Enforcement is fully configured.
-        if (setback == Setback.MOVEMENT && cfg.setbacksEnabled()
-                && total >= cc.setbackThreshold() && confidence >= 0.75) {
-            data.markMovementCorrection();
+        } else if (cfg.loggingEnabled()) {
+            plugin.notifier().alert(player, checkName, checkType, categoryFor(checkName),
+                    total, confidence, detail, correcting);
         }
 
         // --- Punishments --------------------------------------------------
         checkPunishments(player, total);
 
         return total;
+    }
+
+    /** Short category label used in alerts/hover. */
+    private String categoryFor(String check) {
+        String c = check.toLowerCase();
+        if (c.equals("reach") || c.equals("killaura")) return "Combat";
+        if (c.equals("scaffold") || c.equals("fastbreak") || c.equals("nuker")) return "World";
+        return "Movement";
     }
 
     /**
@@ -156,24 +154,6 @@ public final class ViolationManager {
             }
         }
         return false;
-    }
-
-    private void broadcastAlert(ConfigManager.Snapshot cfg, Player player, String checkName,
-                                double total, double confidence) {
-        String msg = cfg.alertFormat()
-                .replace("%player%", player.getName())
-                .replace("%check%", checkName)
-                .replace("%vl%", String.format("%.1f", total))
-                .replace("%ping%", String.valueOf(player.getPing()))
-                .replace("%tps%", String.format("%.1f", plugin.tps()))
-                .replace("%confidence%", String.valueOf((int) (confidence * 100)));
-        for (Player online : Bukkit.getOnlinePlayers()) {
-            if (online.hasPermission("lac.alerts")) {
-                online.sendMessage(msg);
-            }
-        }
-        // Also mirror alerts to the server log so staff can review later.
-        plugin.getLogger().info("[ALERT] " + msg);
     }
 
     /** Current VL for a single check (0 if none). Used by enforcement gates. */
