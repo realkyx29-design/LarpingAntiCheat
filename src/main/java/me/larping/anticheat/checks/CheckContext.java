@@ -148,24 +148,53 @@ public final class CheckContext {
     }
 
     /**
-     * True when the player is actually permitted to fly. The ONLY source of
-     * truth is the server itself ({@code getAllowFlight()}), which is true for
-     * OPs in Creative and for anyone legitimately granted flight (e.g. /fly).
-     * Spectator always flies. Being in Creative does NOT grant flight by itself
-     * here: a non-OP Creative player whose server never enabled flight is not
-     * permitted to fly, so the FlightEnforcer stops it.
+     * True when the player is actually permitted to fly, based on AUTHORISED
+     * status rather than the gamemode alone. Vanilla Paper sets
+     * {@code getAllowFlight()} true for everyone in Creative — including a
+     * non-OP player who used to be OP — so that flag alone is not proof of
+     * permission. Flight is authorised only when the player:
+     * <ul>
+     *   <li>is in Spectator (the server always flies spectators),</li>
+     *   <li>is a live server operator ({@code isOp()}), or</li>
+     *   <li>holds the bypass permission or a real fly permission
+     *       (e.g. {@code essentials.fly}, {@code hyphon.fly}) <b>and</b> is in
+     *       Creative (a player must already be able to have flight enabled
+     *       for that permission to apply in survival).</li>
+     * </ul>
+     * A non-OP Creative player with no fly permission is therefore NOT
+     * authorised, even though {@code getAllowFlight()} returns true.
      */
     public static boolean serverAllowsFlight(Player player) {
         try {
-            if (player.getGameMode() == GameMode.SPECTATOR) return true;
-            return player.getAllowFlight();
+            GameMode gm = player.getGameMode();
+            if (gm == GameMode.SPECTATOR) return true;
+            if (player.isOp()) return true;
+
+            boolean bypass = hasNode(player,
+                    "hyphon.bypass", "lac.bypass",
+                    "hyphon.fly", "essentials.fly", "essentialsf.fly",
+                    "cmi.command.fly", "minecraft.commands.fly");
+            // In survival a real flight permission (essentials/cmi) can
+            // legitimately enable flight; in creative only an explicit fly
+            // permission or OP authorises (so default non-OP creative is off).
+            return bypass && (player.getAllowFlight());
         } catch (Throwable t) {
-            return true; // fail open on API errors (avoid false positives)
+            // Fail open only on a genuine API error (not expected).
+            return false;
         }
     }
 
+    private static boolean hasNode(Player player, String... nodes) {
+        for (String n : nodes) {
+            try {
+                if (n != null && player.hasPermission(n)) return true;
+            } catch (Throwable ignored) { }
+        }
+        return false;
+    }
+
     /** True when flight is currently illegal for this player (flying without
-     *  server permission and not gliding/levitating). Used by FlightEnforcer. */
+     *  authorisation and not gliding/levitating/in a vehicle). */
     public static boolean isUnauthorizedFlying(Player player) {
         try {
             if (serverAllowsFlight(player)) return false;

@@ -4,23 +4,32 @@ import me.larping.anticheat.LarpingAntiCheat;
 import me.larping.anticheat.checks.CheckContext;
 import me.larping.anticheat.data.PlayerData;
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
 
 /**
  * Per-tick flight-authority enforcement.
  *
- * <p>The server is the single authority for who may fly. A player is allowed to
- * fly only when {@code getAllowFlight()} is true (OPs and anyone granted flight
- * by the server) or in Spectator mode. Being in Creative is not enough by
- * itself for a non-OP player: if they are flying while the server never
- * enabled flight and they are not elytra-gliding/levitating, that is
- * unauthorized flight.
+ * <p>The plugin — not the client — decides who may fly. Authorised fliers are
+ * OPs, Spectators, or players with an explicit fly/bypass permission
+ * (see {@link CheckContext#serverAllowsFlight}). A non-OP Creative player who
+ * is flying without authorisation (e.g. de-opped while still flying) is
+ * handled deterministically every tick:
  *
- * <p>This never rubber-bands movement (no teleport), so it cannot cause the
- * false setbacks players feel from the movement checks. By default it logs the
- * violation; if flight enforcement is enabled in config it also cleanly disables
- * the illegal flight state ({@code setAllowFlight(false)} / {@code setFlying(false)})
- * so the cheat cannot continue flying, without moving the player.
+ * <ol>
+ *   <li>the violation is logged (skid line) and accumulates a short
+ *       confirmation buffer (ignores one-off jitter / lag),</li>
+ *   <li>flight is disabled for the client ({@code setAllowFlight(false)} /
+ *       {@code setFlying(false)}) so vanilla stops them,</li>
+ *   <li>if {@code enforce-flight} is on and the player is still airborne, they
+ *       are pulled back to their last server-valid grounded position — this
+ *       works even in Creative and never relies on the heuristic movement
+ *       checks (which stay log-only to avoid false rubber-banding).</li>
+ * </ol>
+ *
+ * Elytra gliding, levitation, vehicles, lag spikes and server
+ * teleports/grace never trigger it.
  */
 public final class FlightEnforcer {
 
@@ -33,54 +42,84 @@ public final class FlightEnforcer {
     public void tick(Player player) {
         try {
             PlayerData data = plugin.data(player);
-
-            // Grace / fully exempt (OP, spectator, bypass permission, login).
             GameMode gm = player.getGameMode();
-            if (gm == GameMode.SPECTATOR) return;
-            if (isOp(player) || hasBypass(player)) {
-                // Trusted players flying in creative must keep flight enabled.
-                if (gm == GameMode.CREATIVE && !player.getAllowFlight()) {
-                    try { player.setAllowFlight(true); } catch (Throwable ignored) { }
-                }
+
+            if (gm == GameMode.SPECTATOR) { data.resetFlyViolation(); return; }
+
+            // Authorised fliers: keep their flight state healthy and clear
+            // any accumulated violation.
+            if (CheckContext.serverAllowsFlight(player)) {
+                data.resetFlyViolation();
                 return;
             }
-            if (data.inHardGrace()) return;
+            // Grace / lag / elytra / levitation / vehicle: not a flight cheat.
+            if (data.inHardGrace()) { data.resetFlyViolation(); return; }
+            if (isLaggy(player)) { data.resetFlyViolation(); return; }
+            if (player.isGliding()
+                    || player.hasPotionEffect(org.bukkit.potion.PotionEffectType.LEVITATION)
+                    || player.isInsideVehicle()) {
+                data.resetFlyViolation();
+                return;
+            }
 
-            if (!CheckContext.isUnauthorizedFlying(player)) return;
+            if (!player.isFlying()) {
+                data.resetFlyViolation();
+                return;
+            }
 
-            // Sustained: count it (avoid one-off jitter).
             int ticks = data.incrementFlyViolation();
-            if (ticks < 6) return;
+            // A few-tick confirmation buffer so a brief packet re-order or a
+            // post-deop client catch-up isn't punished instantly.
+            if (ticks < 3) return;
 
-            // Always log the skid line.
+            // Always log.
+            plugin.notifier().logFlag(player, "Fly", "Movement", ticks, 0.97,
+                    "unauthorized flight gamemode=" + gm
+                            + " op=" + player.isOp()
+                            + " allowFlight=" + player.getAllowFlight()
+                            + " ticks=" + ticks);
+
+            // Deterministic enforcement (on by default for flight authority —
+            // this is not the heuristic movement-correction toggle).
+            // 1) Turn off the client's flight capability (stops creative fly).
             try {
-                plugin.notifier().logFlag(player, "Fly", "Movement", ticks, 0.95,
-                        "unauthorized flight in gamemode=" + gm
-                                + " allowFlight=" + player.getAllowFlight()
-                                + " op=" + isOp(player) + " ticks=" + ticks);
+                player.setAllowFlight(false);
+                player.setFlying(false);
             } catch (Throwable ignored) { }
 
-            // Optionally stop the illegal flight (no teleport). Off by default.
-            if (plugin.configManager().get().enforceFlight()) {
-                try {
-                    player.setFlying(false);
-                    player.setAllowFlight(false);
-                } catch (Throwable ignored) { }
+            if (plugin.configManager().get().enforceFlight() && ticks >= 3) {
+                // 2) Pull back to the last verified grounded position so the
+                //    client cannot simply keep ascending. This is the only
+                //    "tp back" and it targets a definite, server-authorised
+                //    illegal state (flying with no permission) — never normal
+                //    walking/elytra/lag, which all return above.
+                Location safe = data.safeLocation();
+                if (safe != null && safe.getWorld() != null
+                        && safe.getWorld().equals(player.getWorld())) {
+                    Location corrected = safe.clone();
+                    corrected.setYaw(player.getLocation().getYaw());
+                    corrected.setPitch(player.getLocation().getPitch());
+                    try {
+                        player.teleport(corrected);
+                        player.setVelocity(new Vector(0, 0, 0));
+                        player.setFallDistance(0);
+                    } catch (Throwable ignored) { }
+                }
             }
         } catch (Throwable ignored) {
-            // Never throw out of the per-tick loop.
+            // Never break the main tick loop.
         }
     }
 
-    private static boolean isOp(Player player) {
-        try { return player.isOp(); } catch (Throwable t) { return false; }
-    }
-
-    private static boolean hasBypass(Player player) {
+    private boolean isLaggy(Player player) {
         try {
-            return player.hasPermission("hyphon.bypass") || player.hasPermission("lac.bypass");
+            double ping = plugin.data(player).smoothPing();
+            double tps = plugin.tps();
+            return ping > plugin.configManager().get().lagCompensationPing()
+                    || (plugin.configManager().get().lagCompensationTps() > 0
+                        && tps < plugin.configManager().get().lagCompensationTps());
         } catch (Throwable t) {
-            return false;
+            return true; // on any doubt, don't punish
         }
     }
 }

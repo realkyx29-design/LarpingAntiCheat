@@ -66,7 +66,7 @@ enforcement:
   # Detect unauthorized flight (including non-OP Creative players flying
   # without server permission). When true, illegal flight is turned off
   # (no teleport); when false it is only logged.
-  enforce-flight: false
+  enforce-flight: true
 
 # Lag handling: when a player's smoothed ping is above this (ms) or the server
 # TPS is below this value, movement correction and position flags are

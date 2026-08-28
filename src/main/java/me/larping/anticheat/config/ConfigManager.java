@@ -142,7 +142,7 @@ public final class ConfigManager {
                 cfg.getBoolean("enforcement.cancel-blocks", false),
                 cfg.getBoolean("enforcement.cancel-breaks", false),
                 cfg.getBoolean("enforcement.correct-movement", false),
-                cfg.getBoolean("enforcement.enforce-flight", false),
+                cfg.getBoolean("enforcement.enforce-flight", true),
                 cfg.getBoolean("punishments.enabled", false),
                 cfg.getBoolean("compatibility.custom-mods.enabled", true),
                 cfg.getBoolean("compatibility.custom-mods.movement-compensation", true),
