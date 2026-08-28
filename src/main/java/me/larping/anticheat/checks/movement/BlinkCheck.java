@@ -2,21 +2,17 @@ package me.larping.anticheat.checks.movement;
 
 import me.larping.anticheat.checks.CheckContext;
 import me.larping.anticheat.config.CheckConfig;
-import org.bukkit.entity.Player;
+import me.larping.anticheat.physics.MovementSnapshot;
 
 /**
  * Blink / freecam / teleport-ahead detection.
  *
- * <p>A legitimate player moves at most a few blocks per packet. A blink hack
- * holds position packets then releases them, and a freecam detach is followed
- * by the real body snapping far forward. Server-initiated teleports fire
- * {@link org.bukkit.event.player.PlayerTeleportEvent} and set teleport grace;
- * this check ignores that window, so the only large single-move deltas left
- * are cheat-originated.
- *
- * <p>The old "Freecam" check flagged a sneaking player more than 10 blocks
- * from their previous position — but freecam never moves the body, so it
- * could never fire; it also missed actual blink entirely.
+ * <p>A legitimate player moves only a few blocks per packet. A blink hack holds
+ * position packets then releases them (large single-move delta); freecam and
+ * teleport-ahead produce the same signature. Server-initiated teleports set
+ * teleport grace and are ignored; riptide/elytra/explosions have their own
+ * envelopes. Only displacements no single-tick latency coalescing could produce
+ * are flagged, with bounded ping slack, so laggy players never false-positive.
  */
 public final class BlinkCheck extends MovementCheck {
 
@@ -25,44 +21,43 @@ public final class BlinkCheck extends MovementCheck {
     }
 
     @Override
-    public void evaluate(Player player, CheckContext ctx) {
+    public void evaluate(CheckContext ctx) {
         if (exempt(ctx) || !checkEnabled(ctx)) return;
+        MovementSnapshot s = ctx.move();
+        if (s == null) return;
 
-        // Server teleports (plugs, portals, commands) are graceful.
+        // Server teleports (plugs/portals/commands) are graceful and rebase.
         if (ctx.data().inTeleportGrace()) return;
+        // Self-propelled launches.
+        if (s.riptide || s.gliding || s.velocityH > 1.0 || s.hasVelocity) return;
 
         CheckConfig cc = ctx.cfg().check("blink");
         double maxH = cc.v1() > 0 ? cc.v1() : 6.0;
         double maxV = cc.v2() > 0 ? cc.v2() : 5.0;
 
-        double hSpeed = ctx.data().horizontalSpeed();
-        double dY = ctx.data().deltaY();
-
-        // Legit launchers: riptide / elytra / explosion velocity.
-        if (ctx.data().inRiptideGrace() || player.isGliding()
-                || ctx.data().expectedVelocityHorizontal() > 1.0) {
-            return;
-        }
-        // Ping bursts can coalesce a few ticks of motion — only flag
-        // displacements that no single-tick coalescing could produce.
         if (ctx.cfg().compensatePing() && ctx.ping() > 150) {
             maxH += Math.min(3.0, (ctx.ping() - 150) / 200.0);
         }
 
-        boolean violation = hSpeed > maxH || Math.abs(dY) > maxV;
+        double h = s.hSpeed;
+        double v = Math.abs(s.deltaY);
+        boolean violation = h > maxH || v > maxV;
+
         if (violation) {
-            double excess = Math.max(hSpeed - maxH, Math.abs(dY) - maxV);
+            double excess = Math.max(h - maxH, v - maxV);
             double confidence = Math.min(0.99, 0.85 + excess * 0.02);
-            ctx.plugin().violations().flag(player, checkName, "Movement",
+            ctx.plugin().violations().flag(ctx.player(), checkName, "Movement",
                     Math.min(1.0, 0.6 + excess * 0.08), confidence,
-                    "hDelta=" + String.format("%.2f", hSpeed)
-                            + " vDelta=" + String.format("%.2f", dY)
-                            + " maxH=" + String.format("%.1f", maxH)
+                    "hDelta=" + f(h) + " vDelta=" + f(s.deltaY) + " maxH=" + f(maxH)
                             + " ping=" + ctx.ping(),
                     me.larping.anticheat.managers.ViolationManager.Setback.MOVEMENT);
             ctx.data().adjustBuffer("blink", 1.0, 32.0);
         } else {
             ctx.data().adjustBuffer("blink", -1.0, 32.0);
         }
+    }
+
+    private static String f(double d) {
+        return String.format("%.2f", d);
     }
 }

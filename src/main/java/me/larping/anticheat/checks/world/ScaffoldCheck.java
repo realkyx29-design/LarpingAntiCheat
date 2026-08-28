@@ -31,7 +31,7 @@ public final class ScaffoldCheck extends WorldCheck {
     }
 
     @Override
-    public void evaluate(Player player, CheckContext ctx) {
+    public void evaluate(CheckContext ctx) {
         // Handled via evaluatePlace.
     }
 

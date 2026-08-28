@@ -1,13 +1,19 @@
 package me.larping.anticheat.checks;
 
-import org.bukkit.entity.Player;
-
 /**
  * Interface representing an observable check in LarpingAntiCheat.
- * Designed to be modular, conservative, and compatible with custom SMP mechanics.
+ *
+ * <p>All player/config access goes through {@link CheckContext}, which carries
+ * the immutable config snapshot and (for movement checks) a per-tick
+ * server-authoritative {@link me.larping.anticheat.physics.MovementSnapshot}.
+ * Checks are modular, conservative and custom-SMP compatible.
  */
 public interface Check {
     String name();
-    boolean enabled();
-    void evaluate(Player player, CheckContext context);
+
+    default boolean enabled() {
+        return true;
+    }
+
+    void evaluate(CheckContext context);
 }

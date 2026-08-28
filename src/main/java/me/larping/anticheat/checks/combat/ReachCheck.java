@@ -27,7 +27,7 @@ public final class ReachCheck extends CombatCheck {
     }
 
     @Override
-    public void evaluate(Player player, CheckContext ctx) {
+    public void evaluate(CheckContext ctx) {
         // Attacks are reported via evaluateAttack.
     }
 

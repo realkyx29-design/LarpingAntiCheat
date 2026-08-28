@@ -82,6 +82,8 @@ public final class LarpingAntiCheat extends JavaPlugin {
             try {
                 PlayerData data = playerDataMap.get(player.getUniqueId());
                 if (data == null) continue;
+                // Update smoothed ping so checks use a stable latency value.
+                data.smoothPing(player.getPing());
                 CheckContext ctx = new CheckContext(this, player, data);
                 checkManager.timer().onTick(ctx);
             } catch (Throwable t) {

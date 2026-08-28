@@ -101,9 +101,12 @@ public final class ViolationManager {
             }
         }
 
-        // --- Setbacks (movement checks only, rate-limited) ----------------
+        // --- Setbacks (movement checks only, rate-limited, high-confidence) -
+        // A setback teleports the player, so it must only fire on a confident
+        // detection (>=0.75) to avoid disrupting legitimate play.
         if (setback == Setback.MOVEMENT && cfg.setbacksEnabled()
-                && total >= cc.setbackThreshold() && data.trySetbackCooldown(cfg.setbackCooldownMs())) {
+                && total >= cc.setbackThreshold() && confidence >= 0.75
+                && data.trySetbackCooldown(cfg.setbackCooldownMs())) {
             Location safe = data.safeLocation();
             if (safe != null && safe.getWorld() != null
                     && safe.getWorld().equals(player.getWorld())) {

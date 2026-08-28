@@ -2,28 +2,23 @@ package me.larping.anticheat.checks.movement;
 
 import me.larping.anticheat.checks.CheckContext;
 import me.larping.anticheat.config.CheckConfig;
-import me.larping.anticheat.util.CollisionUtil;
-import org.bukkit.Location;
-import org.bukkit.block.Block;
-import org.bukkit.entity.Player;
-import org.bukkit.potion.PotionEffectType;
+import me.larping.anticheat.physics.MovementSnapshot;
 
 /**
- * Flight / glide / hover detection.
+ * Flight / hover / glide detection based on gravity.
  *
  * <p>The vanilla game always applies gravity: a player airborne for longer
- * than the longest legitimate jump/glide must be accelerating downward.
- * The old check only flagged near-zero deltaY (perfect hover) and reset its
- * air counter on ANY downward movement, so horizontal flight bypassed it.
- *
- * <p>This version flags three independent signals:
+ * than the longest legitimate jump/glide must be accelerating downward. The
+ * old check only flagged near-zero deltaY (perfect hover) and reset its air
+ * counter on ANY downward movement, so horizontal flight bypassed it. This
+ * version flags, with confirmation buffers and generous per-state envelopes:
  * <ol>
- *   <li>sustained airborne time without a downward arc (glide/fly)</li>
- *   <li>upward movement with no ground, no jump start and no potion (vertical fly)</li>
- *   <li>near-stationary hover high above ground</li>
+ *   <li>sustained airborne time while NOT falling (glide/horizontal fly),</li>
+ *   <li>upward acceleration mid-air with no valid cause (vertical fly),</li>
+ *   <li>near-stationary hover high above ground.</li>
  * </ol>
- * All with proper carve-outs for gliding, levitation, slow falling, climbing,
- * liquids, riptide, recent knockback/velocity, slime bounces and teleports.
+ * Gliding, levitation, slow falling, climbing, liquids, riptide, bounces and
+ * knockback are all accounted for via the shared {@link MovementSnapshot}.
  */
 public final class FlyCheck extends MovementCheck {
 
@@ -32,99 +27,65 @@ public final class FlyCheck extends MovementCheck {
     }
 
     @Override
-    public void evaluate(Player player, CheckContext ctx) {
+    public void evaluate(CheckContext ctx) {
         if (exempt(ctx) || !checkEnabled(ctx)) return;
+        MovementSnapshot s = ctx.move();
+        if (s == null) return;
+
+        // States fly physics cannot model — handled by dedicated checks/legit.
+        if (s.gliding || s.levitation || s.riptide) { decay(ctx); return; }
+        if (s.feetInLiquid || s.headInLiquid || s.inLava || s.onClimbable || s.inWeb) {
+            decay(ctx); return;
+        }
 
         CheckConfig cc = ctx.cfg().check("fly");
+        double minConfirm = cc.v2() > 0 ? cc.v2() : 4.0;
 
-        // Legitimate flight-like states are fully exempt.
-        if (player.isGliding()) return;
-        if (player.hasPotionEffect(PotionEffectType.LEVITATION)) return;
-        if (ctx.data().inRiptideGrace()) return;
-        if (ctx.data().inTeleportGrace()) return;
+        double dY = s.deltaY;
+        double lastDY = s.lastDeltaY;
+        int maxAir = s.maxSustainedAirTicks(
+                (ctx.cfg().customModsEnabled() && ctx.cfg().customMovementComp()) ? 6 : 0);
 
-        Location loc = player.getLocation();
-        Block feet = loc.getBlock();
-        Block head = loc.clone().add(0, 0.8, 0).getBlock();
-        Block below = loc.clone().subtract(0, 0.3, 0).getBlock();
+        boolean airborne = !s.serverGround;
+        boolean violation = false;
+        String reason = null;
 
-        boolean inLiquid = feet.isLiquid() || head.isLiquid() || below.isLiquid();
-        boolean climbing = player.isClimbing()
-                || nameContains(feet, "LADDER", "VINE", "SCAFFOLDING", "TWISTING", "WEEPING", "CAVE_VINES");
-        if (inLiquid || climbing) return;
-
-        boolean serverGround = CollisionUtil.isOnGround(loc);
-        int airTicks = ctx.data().airTicks();
-
-        double deltaY = ctx.data().deltaY();
-        double lastDeltaY = ctx.data().lastDeltaY();
-
-        // ---- Potion-aware envelope ----------------------------------------
-        int maxAirTicks = (int) cc.v1();                       // default 18
-        if (player.hasPotionEffect(PotionEffectType.JUMP_BOOST)) {
-            var fx = player.getPotionEffect(PotionEffectType.JUMP_BOOST);
-            maxAirTicks += 4 + (fx != null ? (fx.getAmplifier() + 1) * 3 : 3);
-        }
-        if (player.hasPotionEffect(PotionEffectType.SLOW_FALLING)) {
-            maxAirTicks += 30;
-        }
-        // Recent knockback / velocity: the server gave them air time.
-        if (ctx.data().hasVelocity()) {
-            maxAirTicks += 12;
-        }
-        // Slime block bounce: big upward launch.
-        if (nameContains(below, "SLIME", "BED") || nameContains(feet, "SLIME")) {
-            maxAirTicks += 14;
-        }
-        // SMP custom movement allowance.
-        if (ctx.cfg().customModsEnabled() && ctx.cfg().customMovementComp()) {
-            maxAirTicks += 6;
-        }
-
-        boolean violation;
-        String reason;
-
-        if (!serverGround && airTicks > maxAirTicks && deltaY >= -0.05) {
-            // Still airborne way past any jump, and not (or barely) falling.
+        // 1) Sustained flight: airborne far past any jump and not falling.
+        if (airborne && s.airTicks > maxAir && dY >= -0.06) {
             violation = true;
-            reason = "sustained-air airTicks=" + airTicks + " dY=" + String.format("%.3f", deltaY)
-                    + " maxAir=" + maxAirTicks;
-        } else if (!serverGround && airTicks > 2 && deltaY > 0.42 && lastDeltaY >= deltaY) {
-            // Upward acceleration mid-air (gravity should slow the rise).
-            // Jump Boost handled by the envelope; fireworks riptide exempt above.
-            boolean boosted = player.hasPotionEffect(PotionEffectType.JUMP_BOOST)
-                    || ctx.data().hasVelocity()
-                    || nameContains(below, "SLIME", "HONEY");
-            violation = !boosted;
-            reason = "upward-accel dY=" + String.format("%.3f", deltaY)
-                    + " lastDY=" + String.format("%.3f", lastDeltaY)
-                    + " airTicks=" + airTicks;
-        } else if (!serverGround && airTicks > 10 && Math.abs(ctx.data().horizontalSpeed()) < 0.02
-                && Math.abs(deltaY) < 0.02) {
-            // Classic hover: stationary in mid-air for half a second+.
+            reason = "sustained-air airTicks=" + s.airTicks + " dY=" + f(dY) + " max=" + maxAir;
+        }
+        // 2) Upward acceleration mid-air (gravity must slow the rise).
+        else if (airborne && s.airTicks > 3 && dY > 0.42 && lastDY >= dY) {
+            boolean caused = s.jumpAmplifier >= 0 || s.hasVelocity || s.onBouncy;
+            if (!caused) {
+                violation = true;
+                reason = "upward-accel dY=" + f(dY) + " lastDY=" + f(lastDY) + " air=" + s.airTicks;
+            }
+        }
+        // 3) Classic hover: essentially stationary in mid-air.
+        else if (airborne && s.airTicks > 12 && s.hSpeed < 0.02 && Math.abs(dY) < 0.02) {
             violation = true;
-            reason = "hover airTicks=" + airTicks + " dY=" + String.format("%.3f", deltaY);
-        } else {
-            violation = false;
-            reason = "";
+            reason = "hover airTicks=" + s.airTicks + " dY=" + f(dY);
         }
 
         if (violation) {
             double buf = ctx.data().adjustBuffer("fly", 1.0, 64.0);
-            if (buf >= cc.v2()) {
-                double confidence = 0.9;
-                ctx.plugin().violations().flag(player, checkName, "Movement",
-                        0.5, confidence, reason + " buffer=" + (int) buf,
+            if (buf >= minConfirm) {
+                ctx.plugin().violations().flag(ctx.player(), checkName, "Movement",
+                        0.5, 0.9, reason + " buffer=" + (int) buf,
                         me.larping.anticheat.managers.ViolationManager.Setback.MOVEMENT);
             }
         } else {
-            ctx.data().adjustBuffer("fly", -2.0, 64.0);
+            decay(ctx);
         }
     }
 
-    private static boolean nameContains(Block b, String... names) {
-        String n = b.getType().name();
-        for (String s : names) if (n.contains(s)) return true;
-        return false;
+    private void decay(CheckContext ctx) {
+        ctx.data().adjustBuffer("fly", -2.0, 64.0);
+    }
+
+    private static String f(double d) {
+        return String.format("%.3f", d);
     }
 }

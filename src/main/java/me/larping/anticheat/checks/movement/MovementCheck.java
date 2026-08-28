@@ -22,11 +22,6 @@ public abstract class MovementCheck implements Check {
         return checkName;
     }
 
-    @Override
-    public boolean enabled() {
-        return true;
-    }
-
     /** Standard movement exemption: vehicles, flight, gamemodes, hard grace. */
     protected boolean exempt(CheckContext ctx) {
         return ctx.isMovementExempt();
@@ -38,21 +33,19 @@ public abstract class MovementCheck implements Check {
     }
 
     /**
-     * Increments the check's confirmation buffer and flags when it reaches the
-     * configured minimum. On a clean pass, decays the buffer.
+     * Increments the confirmation buffer on violation and flags when it reaches
+     * the configured minimum; decays the buffer on a clean pass.
      */
     protected void bufferedFlag(CheckContext ctx, boolean violation, double vlAmount,
                                 double confidence, String detail, double minConfirm) {
-        double buf;
         if (violation) {
-            buf = ctx.data().adjustBuffer(bufferKey, 1.0, 64.0);
+            double buf = ctx.data().adjustBuffer(bufferKey, 1.0, 64.0);
+            if (buf >= minConfirm) {
+                ctx.plugin().violations().flag(ctx.player(), checkName, "Movement",
+                        vlAmount, confidence, detail, ViolationManager.Setback.MOVEMENT);
+            }
         } else {
             ctx.data().adjustBuffer(bufferKey, -1.5, 64.0);
-            return;
-        }
-        if (buf >= minConfirm) {
-            ctx.plugin().violations().flag(ctx.player(), checkName, "Movement",
-                    vlAmount, confidence, detail, ViolationManager.Setback.MOVEMENT);
         }
     }
 

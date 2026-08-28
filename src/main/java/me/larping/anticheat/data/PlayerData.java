@@ -214,6 +214,21 @@ public final class PlayerData {
     public long lastTimerTickMs = 0L;
     public int movePacketsThisWindow = 0;
 
+    // Smoothed ping (exponential moving average) to avoid threshold flapping
+    // during momentary lag spikes. Updated by the per-second maintenance task.
+    private int smoothPing = 0;
+    private boolean pingInit = false;
+
+    public int smoothPing(int rawPing) {
+        if (!pingInit) { smoothPing = Math.max(0, rawPing); pingInit = true; }
+        else smoothPing = (int) Math.round(smoothPing * 0.7 + Math.max(0, rawPing) * 0.3);
+        return smoothPing;
+    }
+
+    public int smoothPing() {
+        return smoothPing;
+    }
+
     public double timerBalance() { return timerBalance; }
     public void timerBalance(double v) { this.timerBalance = v; }
     public double timerBurst() { return timerBurst; }

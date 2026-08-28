@@ -2,21 +2,16 @@ package me.larping.anticheat.checks.movement;
 
 import me.larping.anticheat.checks.CheckContext;
 import me.larping.anticheat.config.CheckConfig;
-import me.larping.anticheat.util.CollisionUtil;
-import org.bukkit.Location;
-import org.bukkit.block.Block;
-import org.bukkit.entity.Player;
-import org.bukkit.potion.PotionEffectType;
+import me.larping.anticheat.physics.MovementSnapshot;
 
 /**
- * Step / High-jump detection (single-move upward teleport onto terrain).
+ * Step / auto-step / high-jump detection.
  *
- * <p>Vanilla auto-step rises 0.6 blocks per move at most, and a standing jump
- * leaves the ground (feet not on ground) before rising. A Step hack raises the
- * player ~1 block while staying "grounded"; tower/scaffold jumps are handled
- * by the Scaffold check. We flag a single upward delta beyond the step limit
- * while the feet remain essentially grounded, excluding jump boosts,
- * slime/beds, climbing, gliding, riptide and recent velocity.
+ * <p>Vanilla auto-step rises ~0.6 blocks per move at most, and a normal jump
+ * leaves the ground (feet off the ground) before rising. A Step hack raises
+ * the player ~1 block in a single move while staying "grounded". We flag a
+ * grounded upward delta beyond the step limit, with carve-outs for jump boost,
+ * slime/bed bounces, climbing, liquids, gliding, riptide and knockback.
  */
 public final class StepCheck extends MovementCheck {
 
@@ -25,66 +20,48 @@ public final class StepCheck extends MovementCheck {
     }
 
     @Override
-    public void evaluate(Player player, CheckContext ctx) {
+    public void evaluate(CheckContext ctx) {
         if (exempt(ctx) || !checkEnabled(ctx)) return;
+        MovementSnapshot s = ctx.move();
+        if (s == null) return;
+
+        if (s.gliding || s.riptide || s.hasVelocity || s.onBouncy || s.levitation
+                || s.onClimbable || s.feetInLiquid || s.inWeb || s.inLava) {
+            decay(ctx); return;
+        }
+        if (s.jumpAmplifier >= 0) { decay(ctx); return; }
 
         CheckConfig cc = ctx.cfg().check("step");
-        double deltaY = ctx.data().deltaY();
+        double maxStep = cc.v1() > 0 ? cc.v1() : 0.85;
+        double minConfirm = cc.v2() > 0 ? cc.v2() : 2.0;
 
-        // Normal movement is downward/level most ticks — cheap exit.
-        if (deltaY <= cc.v1()) {
-            ctx.data().adjustBuffer("step", -2.0, 32.0);
-            return;
-        }
+        // Cheap exit for normal/downward motion.
+        if (s.deltaY <= maxStep) { decay(ctx); return; }
 
-        if (player.isGliding() || ctx.data().inRiptideGrace() || ctx.data().hasVelocity()) {
-            ctx.data().adjustBuffer("step", -2.0, 32.0);
-            return;
-        }
+        // A genuine jump: airborne at this sample. A step hack is a GROUNDED
+        // rise (feet stay at ground level).
+        boolean groundedRise = s.serverGround;
 
-        Location loc = player.getLocation();
-        Block feet = loc.getBlock();
-        if (player.isClimbing() || feet.isLiquid()
-                || feet.getType().name().contains("LADDER")
-                || feet.getType().name().contains("VINE")
-                || feet.getType().name().contains("SCAFFOLDING")) {
-            ctx.data().adjustBuffer("step", -2.0, 32.0);
-            return;
-        }
-
-        // Jump boost legitimately raises the arc — but a jump still leaves the
-        // ground immediately, whereas a step stays at ground level.
-        boolean wasAir = ctx.data().airTicks() > 1
-                && !CollisionUtil.isOnGround(loc)
-                && !CollisionUtil.isOnGround(loc.clone().subtract(0, 0.25, 0));
-
-        Block below = loc.clone().subtract(0, 0.3, 0).getBlock();
-        boolean bouncy = below.getType().name().contains("SLIME")
-                || below.getType().name().contains("BED")
-                || below.getType().name().contains("HONEY");
-
-        boolean potionJump = player.hasPotionEffect(PotionEffectType.JUMP_BOOST)
-                || player.hasPotionEffect(PotionEffectType.LEVITATION);
-
-        // A real jump: player is airborne at the apex sample. A Step hack is a
-        // grounded rise (feet stay within ~0.15 of a block surface).
-        boolean groundedRise = !wasAir;
-        boolean violation = groundedRise && !bouncy && !potionJump
-                && deltaY > cc.v1();
-
-        if (violation) {
+        if (groundedRise) {
             double buf = ctx.data().adjustBuffer("step", 1.0, 32.0);
-            if (buf >= cc.v2()) {
-                ctx.plugin().violations().flag(player, checkName, "Movement",
+            if (buf >= minConfirm) {
+                ctx.plugin().violations().flag(ctx.player(), checkName, "Movement",
                         0.55, 0.9,
-                        "dY=" + String.format("%.3f", deltaY)
-                                + " hSpeed=" + String.format("%.3f", ctx.data().horizontalSpeed())
-                                + " below=" + below.getType().name().toLowerCase()
+                        "grounded dY=" + f(s.deltaY) + " hSpeed=" + f(s.hSpeed)
+                                + " below=" + s.belowBlock.getType().name().toLowerCase()
                                 + " buffer=" + (int) buf,
                         me.larping.anticheat.managers.ViolationManager.Setback.MOVEMENT);
             }
         } else {
-            ctx.data().adjustBuffer("step", -2.0, 32.0);
+            decay(ctx);
         }
+    }
+
+    private void decay(CheckContext ctx) {
+        ctx.data().adjustBuffer("step", -2.0, 32.0);
+    }
+
+    private static String f(double d) {
+        return String.format("%.3f", d);
     }
 }

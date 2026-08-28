@@ -2,23 +2,18 @@ package me.larping.anticheat.checks.movement;
 
 import me.larping.anticheat.checks.CheckContext;
 import me.larping.anticheat.config.CheckConfig;
-import me.larping.anticheat.util.CollisionUtil;
-import org.bukkit.entity.Player;
+import me.larping.anticheat.physics.MovementSnapshot;
 
 /**
- * Ground-state spoofing (NoFall and ground-lying cheat clients).
+ * Ground-state spoofing (NoFall / lying about ground contact).
  *
- * <p>The old check was logically dead: {@code airTicks} was reset to 0 on
- * every move where {@code player.isOnGround()} was true, so its condition
- * {@code isOnGround() && airTicks > 10} could never hold.
- *
- * <p>Bukkit's {@link Player#isOnGround()} reflects the server's own collision
- * state in modern Paper (a spoofed client onGround flag is rejected). We
- * therefore compare that server ground state against an independent
- * collision-shape computation: the real tell of NoFall is a player clearly
- * airborne and descending yet *never accumulating* vertical fall — i.e. the
- * client resetting fall state. Here we flag the impossible combination
- * "server says onGround, collision check says no ground, while descending".
+ * <p>The old check was logically dead: {@code airTicks} was reset to 0 on every
+ * move where {@code player.isOnGround()} was true, so its condition could never
+ * hold. Modern Paper already derives ground state from real collision, so this
+ * check only flags the <b>impossible</b> combination: the client claims to be on
+ * the ground while the player is clearly airborne and falling fast (NoFall
+ * clients spam onGround to avoid fall damage). Airborne/descending players are
+ * never flagged for being airborne — only the contradictory ground claim.
  */
 public final class GroundSpoofCheck extends MovementCheck {
 
@@ -27,34 +22,40 @@ public final class GroundSpoofCheck extends MovementCheck {
     }
 
     @Override
-    public void evaluate(Player player, CheckContext ctx) {
+    public void evaluate(CheckContext ctx) {
         if (exempt(ctx) || !checkEnabled(ctx)) return;
+        MovementSnapshot s = ctx.move();
+        if (s == null) return;
+
+        // Only meaningful when genuinely airborne; liquids/climb/levitation
+        // produce ambiguous ground states and are exempt.
+        if (s.serverGround || s.feetInLiquid || s.onClimbable || s.levitation
+                || s.gliding || s.riptide || s.slowFalling) {
+            ctx.data().adjustBuffer("groundspoof", -2.0, 32.0);
+            return;
+        }
 
         CheckConfig cc = ctx.cfg().check("groundspoof");
-        double deltaY = ctx.data().deltaY();
-        int airTicks = ctx.data().airTicks();
+        double minConfirm = cc.v1() > 0 ? cc.v1() : 3.0;
 
-        boolean clientGround = player.isOnGround();
-        boolean collisionGround = CollisionUtil.isOnGround(player.getLocation());
-
-        boolean impossible = false;
-        String detail = null;
-
-        if (clientGround && !collisionGround && deltaY < -0.42 && airTicks > 6) {
-            impossible = true;
-            detail = "claimsGround while falling dY=" + String.format("%.3f", deltaY)
-                    + " airTicks=" + airTicks;
-        }
+        // Client falsely claims ground contact while falling in mid-air.
+        boolean impossible = s.clientGround && s.airTicks > 6 && s.deltaY < -0.42;
 
         if (impossible) {
             double buf = ctx.data().adjustBuffer("groundspoof", 1.0, 32.0);
-            if (buf >= cc.v1()) {
-                ctx.plugin().violations().flag(player, checkName, "Movement",
-                        0.45, 0.85, detail + " buffer=" + (int) buf,
+            if (buf >= minConfirm) {
+                ctx.plugin().violations().flag(ctx.player(), checkName, "Movement",
+                        0.45, 0.85,
+                        "claimsGround while falling dY=" + f(s.deltaY) + " air=" + s.airTicks
+                                + " buffer=" + (int) buf,
                         me.larping.anticheat.managers.ViolationManager.Setback.NONE);
             }
         } else {
             ctx.data().adjustBuffer("groundspoof", -2.0, 32.0);
         }
+    }
+
+    private static String f(double d) {
+        return String.format("%.3f", d);
     }
 }

@@ -23,7 +23,7 @@ public final class NukerCheck extends WorldCheck {
     }
 
     @Override
-    public void evaluate(Player player, CheckContext ctx) {
+    public void evaluate(CheckContext ctx) {
         // Driven by break events.
     }
 

@@ -4,6 +4,7 @@ import me.larping.anticheat.LarpingAntiCheat;
 import me.larping.anticheat.checks.CheckContext;
 import me.larping.anticheat.data.PlayerData;
 import me.larping.anticheat.managers.CheckManager;
+import me.larping.anticheat.physics.MovementSnapshot;
 import me.larping.anticheat.util.CollisionUtil;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -182,7 +183,7 @@ public final class AntiCheatListener implements Listener {
             // Look-only packet: still worth feeding the timer packet counter.
             CheckContext ctx = new CheckContext(plugin, player, data);
             if (passes(player)) {
-                checks.timer().evaluate(player, ctx);
+                checks.timer().evaluate(ctx);
             }
             return;
         }
@@ -195,24 +196,28 @@ public final class AntiCheatListener implements Listener {
             data.safeLocation(to);
         }
 
-        CheckContext ctx = new CheckContext(plugin, player, data);
+        // Build the authoritative physics snapshot ONCE; every movement check
+        // reasons from this verified state (no client flags, no duplicate
+        // block/collision lookups).
+        MovementSnapshot snap = MovementSnapshot.capture(player, data, data.prevLocation(), to);
+        CheckContext ctx = new CheckContext(plugin, player, data, snap);
         if (!passes(player)) return;
 
         // Feed killaura rotation snaps (cheap).
         checks.killAura().recordRotation(player, ctx, oldYaw, to.getYaw());
 
         // Movement checks in cheapest-first order.
-        checks.timer().evaluate(player, ctx);
-        checks.get("blink").evaluate(player, ctx);
-        checks.get("speed").evaluate(player, ctx);
-        checks.get("noslow").evaluate(player, ctx);
-        checks.get("fly").evaluate(player, ctx);
-        checks.get("step").evaluate(player, ctx);
-        checks.get("spider").evaluate(player, ctx);
-        checks.get("jesus").evaluate(player, ctx);
-        checks.get("groundspoof").evaluate(player, ctx);
-        checks.get("phase").evaluate(player, ctx);
-        checks.get("noknockback").evaluate(player, ctx);
+        checks.timer().evaluate(ctx);
+        checks.get("blink").evaluate(ctx);
+        checks.get("speed").evaluate(ctx);
+        checks.get("noslow").evaluate(ctx);
+        checks.get("fly").evaluate(ctx);
+        checks.get("step").evaluate(ctx);
+        checks.get("spider").evaluate(ctx);
+        checks.get("jesus").evaluate(ctx);
+        checks.get("groundspoof").evaluate(ctx);
+        checks.get("phase").evaluate(ctx);
+        checks.get("noknockback").evaluate(ctx);
     }
 
     /** Quick gate before building/evaluating checks: creative/dead/bypass handled here. */
@@ -239,7 +244,7 @@ public final class AntiCheatListener implements Listener {
         checks.reach().evaluateAttack(attacker, target, ctx);
         checks.killAura().evaluateAttack(attacker, target, ctx);
         checks.killAura().evaluateSnapOnAttack(ctx);
-        checks.killAura().evaluate(attacker, ctx);
+        checks.killAura().evaluate(ctx);
     }
 
     // ================================================================

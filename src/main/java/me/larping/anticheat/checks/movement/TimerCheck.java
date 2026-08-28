@@ -29,7 +29,7 @@ public final class TimerCheck extends MovementCheck {
     }
 
     @Override
-    public void evaluate(Player player, CheckContext ctx) {
+    public void evaluate(CheckContext ctx) {
         // Per-move event: just count packets. The balance is updated and
         // evaluated once per tick by {@link #onTick(CheckContext)}.
         if (exempt(ctx)) {
