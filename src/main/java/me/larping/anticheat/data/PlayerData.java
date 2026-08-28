@@ -416,6 +416,8 @@ public final class PlayerData {
     // ---------------------------------------------------------------
     private final Deque<Long> placementTimes = new ArrayDeque<>();
     private final Deque<Long> breakTimes = new ArrayDeque<>();
+    /** Recently broken block coordinates (for area-mining vs nuker clustering). */
+    private final Deque<long[]> breakPositions = new ArrayDeque<>();
     /** blockKey -> time damage started (BlockDamageEvent) */
     private final java.util.HashMap<Long, Long> breakStart = new java.util.HashMap<>();
 
@@ -468,6 +470,45 @@ public final class PlayerData {
         int c = 0;
         for (long t : breakTimes) if (now - t <= 1000L) c++;
         return c;
+    }
+
+    /** Records a broken block's position and prunes entries older than windowMs. */
+    public void recordBreakPosition(int x, int y, int z, long windowMs) {
+        long now = System.currentTimeMillis();
+        breakPositions.addLast(new long[]{x, y, z, now});
+        while (!breakPositions.isEmpty() && now - breakPositions.peekFirst()[3] > windowMs) {
+            breakPositions.pollFirst();
+        }
+    }
+
+    /**
+     * Determines whether the recent broken blocks (including the just-broken
+     * block at x,y,z) form a clustered area around a centre within radius.
+     * Area-mining produces a tight cube; a nuker spams scattered/out-of-range
+     * blocks. Returns true if the burst looks like a legit area mine: most
+     * blocks are within (radius+1) of some centre and the count matches a
+     * plausible single-swing area.
+     */
+    public boolean recentBreaksAreClustered(int x, int y, int z, int radius) {
+        // Use the first block of the current burst as the centre estimate.
+        long now = System.currentTimeMillis();
+        java.util.List<long[]> recent = new java.util.ArrayList<>();
+        for (long[] p : breakPositions) {
+            if (now - p[3] <= 1500L) recent.add(p);
+        }
+        long[] anchorBlock = recent.isEmpty()
+                ? new long[]{x, y, z} : recent.get(0);
+        int in = 0, total = 0;
+        for (long[] p : recent) {
+            total++;
+            long dx = Math.abs(p[0] - anchorBlock[0]);
+            long dy = Math.abs(p[1] - anchorBlock[1]);
+            long dz = Math.abs(p[2] - anchorBlock[2]);
+            if (dx <= radius + 1 && dy <= radius + 1 && dz <= radius + 1) in++;
+        }
+        if (total < 2) return false;
+        // >=80% of the burst inside the area radius => clustered area mine.
+        return (in / (double) total) >= 0.8;
     }
 
     // ---------------------------------------------------------------

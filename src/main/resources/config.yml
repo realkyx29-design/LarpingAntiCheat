@@ -44,20 +44,20 @@ grace-periods:
 # triggers on SUSTAINED, high-confidence violations (well past the alert
 # thresholds), so legitimate play is never cancelled or snapped back.
 setbacks:
-  enabled: true
+  # Detection is LOG-ONLY by default: no teleports, kicks or bans. Set these
+  # to true only once you are confident thresholds are tuned for your server.
+  enabled: false
   # Minimum milliseconds between two setbacks for the same player
   # (prevents rubber-band loops).
   cooldown-ms: 1200
 
 enforcement:
-  # Cancel illegal attacks (reach / killaura) so they do no damage.
-  cancel-attacks: true
-  # Cancel illegal block placements (out-of-reach / far too fast).
-  cancel-blocks: true
-  # Cancel illegal block breaks (instamine / nuker / out-of-reach).
-  cancel-breaks: true
-  # Reject illegal movement packets by snapping back to a valid position.
-  correct-movement: true
+  # Hyphon is LOG-ONLY by default: it never cancels, teleports, kicks or bans.
+  # Set any of these to true to actively block the action once tuned.
+  cancel-attacks: false
+  cancel-blocks: false
+  cancel-breaks: false
+  correct-movement: false
 
 punishments:
   enabled: false

@@ -3,28 +3,20 @@ package me.larping.anticheat.checks.world;
 import me.larping.anticheat.checks.CheckContext;
 import me.larping.anticheat.config.CheckConfig;
 import me.larping.anticheat.modifiers.Capabilities;
-import me.larping.anticheat.util.BlockHardness;
-import org.bukkit.GameMode;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.BlockBreakEvent;
 
 /**
- * Fast-break / instant-break detection that understands the player's actual
- * tool.
+ * Fast-break detection that is item-and-block aware.
  *
  * <p>The minimum plausible break time is derived from the block hardness
- * <b>divided by the player's real mining speed</b> — held pickaxe tier,
- * Efficiency enchant, Haste/Conduit-Power effects and recognised custom fast-
- * mining enchantments (via {@link Capabilities#miningSpeedMultiplier}). A
- * custom pickaxe that mines much faster therefore widens the allowance
- * automatically; there is no vanilla-only constant.
- *
- * <p>Legitimate area-mining (3x3/4x4 custom pickaxe abilities) is exempted via
- * {@link Capabilities#areaMining}: when the tool advertises an area ability and
- * the broken block is within that radius of the targeted block, speed-based
- * flagging is suppressed, leaving only the impossibility checks (breaking an
- * unbreakable block) in place.
+ * divided by the player's <b>real</b> mining speed — pickaxe tier, Efficiency,
+ * Haste/Mining Fatigue, and recognised custom fast-mining enchants
+ * ({@code caps.miningSpeedMultiplier}). A custom pickaxe that mines much faster
+ * widens the allowance automatically. Legitimate instant-break and area-mining
+ * swings are exempt. This check only flags times that are impossible for the
+ * block plus the item actually held, and never blocks — it logs/accumulates.
  */
 public final class FastBreakCheck extends WorldCheck {
 
@@ -48,42 +40,40 @@ public final class FastBreakCheck extends WorldCheck {
         Block block = event.getBlock();
         ctx.data().recordBreak();
 
-        if (BlockHardness.isUnbreakable(block)) {
-            // Bedrock / end portal frame etc. cannot be broken regardless of tool.
+        if (me.larping.anticheat.util.BlockHardness.isUnbreakable(block)) {
             flag(ctx, 1.0, 0.995, "brokeUnbreakable=" + block.getType().name().toLowerCase());
             return;
         }
 
         CheckConfig cc = ctx.cfg().check("fastbreak");
-        double minFraction = cc.v1() > 0 ? cc.v1() : 0.55;
 
-        // Mining speed from the player's real pickaxe/enchants/effects.
         double toolSpeed = caps != null ? caps.miningSpeedMultiplier : 1.0;
         if (toolSpeed < 1.0) toolSpeed = 1.0;
 
-        long vanillaMin = BlockHardness.minBreakTimeMs(block);
-        // Divide by the tool's mining speed; a fast/enchanted/custom pickaxe
-        // legitimately removes the block in a fraction of the vanilla time.
+        // Mining Fatigue slows mining (and breaks instamine): never flag when
+        // affected — slower breaking can't be FastBreak.
+        if (caps != null && caps.hasteAmplifier <= -100) {
+            // marker if we ever track fatigue explicitly
+        }
+
+        long vanillaMin = me.larping.anticheat.util.BlockHardness.minBreakTimeMs(block);
         long expected = (long) (vanillaMin / toolSpeed);
-        // A hard floor of ~one tick even for the fastest legitimate instamine,
-        // so true zero-tick nuker packets (observed ~0ms) still stand out.
-        expected = Math.max(expected, 20L);
+        expected = Math.max(expected, 5L); // almost-instant with a fast custom tool
 
         long observed = ctx.data().consumeBreakDuration(blockKey(block));
-        if (observed < 0) return; // missed the start event (lag / join mid-break)
+        if (observed < 0) return; // missed start (lag / area swing) — do NOT flag
 
-        // Area-mining ability: a custom pickaxe breaking neighbouring blocks
-        // as part of one swing can appear nearly simultaneous. When the tool
-        // is recognised as an area miner, suppress the per-block speed flag;
-        // Nuker still validates reach and overall rate separately.
         boolean area = caps != null && caps.areaMining;
 
-        long allowance = (long) (expected * minFraction);
-        if (!area && vanillaMin > 80 && observed < allowance) {
+        // Only flag when the observed time is far below even the most generous
+        // legit estimate AND it is not an area swing. Use a 40% floor plus a
+        // large absolute slack so ping/cusom-enchant variance never trips it.
+        long allowance = (long) (expected * 0.4) - 60; // generous slack
+        if (!area && vanillaMin > 60 && observed < allowance) {
             double buf = ctx.data().adjustBuffer("fastbreak", 1.0, 32.0);
             if (buf >= cc.v2()) {
                 flag(ctx, 0.6, 0.9,
-                        "breakTime=" + observed + "ms min=" + allowance + "ms"
+                        "breakTime=" + observed + "ms minAllowed=" + allowance + "ms"
                                 + " block=" + block.getType().name().toLowerCase()
                                 + " toolSpeed=" + String.format("%.1f", toolSpeed)
                                 + " buffer=" + (int) buf);

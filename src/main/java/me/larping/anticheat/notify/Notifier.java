@@ -68,6 +68,8 @@ public final class Notifier {
         Location l = player.getLocation();
         String coords = String.format("%.0f, %.0f, %.0f", l.getX(), l.getY(), l.getZ());
         String world = l.getWorld() != null ? l.getWorld().getName() : "?";
+        // Human-readable description of what was detected.
+        String what = describe(check, category);
 
         String hover = String.join("\n",
                 "§c§lHyphon §7v" + plugin.getDescription().getVersion(),
@@ -96,11 +98,44 @@ public final class Notifier {
             sendHover(staff, base, hover);
         }
 
-        // Full console record on every flag.
+        // Full console record in the requested format:
+        // [Hyphon] detected a skid: <player> : <what was detected> : <count>
         plugin.getLogger().info(String.format(
-                "[FLAG] %s failed %s (%s) VL=%.1f conf=%d%% ping=%dms tps=%.1f @%s %s%s | %s",
-                name, check, type, vl, (int) (confidence * 100), ping, tps,
-                coords, world, setback ? " [SETBACK]" : "", detail));
+                "[Hyphon] detected a skid: %s : %s : %d time(s)",
+                name, what, (int) Math.max(1, Math.round(vl))));
+        // Detailed technical line for staff who want offsets/ping.
+        plugin.getLogger().info(String.format(
+                "    detail %s (%s) VL=%.1f conf=%d%% ping=%dms tps=%.1f @%s %s | %s",
+                name, check, vl, (int) (confidence * 100), ping, tps,
+                coords, world, detail));
+    }
+
+    /** Human-readable detection description for the console log. */
+    private String describe(String check, String category) {
+        return switch (check.toLowerCase()) {
+            case "speed" -> "moving faster than their gear/effects allow";
+            case "fly" -> "flying without permission";
+            case "boatfly" -> "boat-flying (boat held aloft)";
+            case "timer" -> "game-timer manipulation";
+            case "phase" -> "phasing through solid blocks";
+            case "groundspoof" -> "spoofing ground state (NoFall)";
+            case "jesus" -> "walking on liquid";
+            case "spider" -> "climbing walls like a spider";
+            case "step" -> "step-high/auto-step exploit";
+            case "blink" -> "blink/teleport-ahead exploit";
+            case "noknockback" -> "cancelling knockback";
+            case "noslow" -> "ignoring item-use slowdown";
+            case "reach" -> "attacking beyond reach";
+            case "killaura" -> "aimbot/kill-aura combat";
+            case "weapondamage" -> "dealing more damage than their weapon can";
+            case "scaffold" -> "placing blocks too fast/out of reach";
+            case "fastbreak" -> "breaking blocks faster than their tool allows";
+            case "nuker" -> "nuker-style mass/out-of-reach block breaking";
+            case "autototem" -> "automated totem swapping";
+            case "autoweb" -> "automated/impossible cobweb placement";
+            case "autocrystal" -> "automated crystal placement/breaking";
+            default -> check + " (" + category + ")";
+        };
     }
 
     /** Movement correction / setback notice (debug + console). */
