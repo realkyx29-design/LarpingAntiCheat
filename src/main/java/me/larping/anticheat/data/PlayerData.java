@@ -53,6 +53,8 @@ public final class PlayerData {
     private int knockbackTicks = 0;
     /** True when the active velocity window was combat knockback (vs self-propelled). */
     private boolean velocityFromKnockback = false;
+    /** Timestamp of the most recent damage the player received (for knockback attribution). */
+    private long lastDamageMs = 0L;
 
     // ---------------------------------------------------------------
     // Grace periods (millis timestamps). Never a blanket movement bypass:
@@ -226,9 +228,22 @@ public final class PlayerData {
         applyVelocity(x, y, z, false);
     }
 
-    /** Combat knockback (from PlayerKnockbackEvent) — validated by NoKnockback. */
+    /**
+     * Combat/explosion knockback (velocity applied right after damage) —
+     * validated by NoKnockback. Called from the PlayerVelocityEvent handler.
+     */
     public void applyKnockback(double x, double y, double z) {
         applyVelocity(x, y, z, true);
+    }
+
+    /** Called when the player takes damage; the next velocity event is knockback. */
+    public void markDamaged() {
+        this.lastDamageMs = System.currentTimeMillis();
+    }
+
+    /** True if damage was taken within the short knockback application window. */
+    public boolean wasDamagedRecently() {
+        return System.currentTimeMillis() - lastDamageMs < 300L;
     }
 
     private void applyVelocity(double x, double y, double z, boolean fromKnockback) {

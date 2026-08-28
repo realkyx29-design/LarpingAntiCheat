@@ -10,12 +10,12 @@ import org.bukkit.entity.Player;
  * Anti-knockback / velocity check.
  *
  * <p>When the server applies knockback it records the expected velocity
- * vector (from {@link org.bukkit.event.entity.EntityVelocityEvent} /
- * {@code PlayerKnockbackEvent}). A few ticks later the player's actual
- * displacement must reflect it. If the observed horizontal movement is a
- * small fraction of what physics predicted — and the player wasn't blocked by
- * a wall, in liquid, in a cobweb or on the ground in a corner — the client is
- * cancelling velocity.
+ * vector (from {@link org.bukkit.event.player.PlayerVelocityEvent} after an
+ * {@link org.bukkit.event.entity.EntityDamageEvent}). A few ticks later the
+ * player's actual displacement must reflect it. If the observed horizontal
+ * movement is a small fraction of what physics predicted — and the player
+ * wasn't blocked by a wall, in liquid, in a cobweb or on the ground in a
+ * corner — the client is cancelling velocity.
  *
  * <p>This replaces the old blanket "velocity grace" which let any player
  * shrug off knockback with zero scrutiny.

@@ -1,6 +1,5 @@
 package me.larping.anticheat.listeners;
 
-import com.destroystokyo.paper.event.player.PlayerKnockbackEvent;
 import me.larping.anticheat.LarpingAntiCheat;
 import me.larping.anticheat.checks.CheckContext;
 import me.larping.anticheat.data.PlayerData;
@@ -18,7 +17,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityVelocityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
@@ -27,6 +26,7 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerRiptideEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
+import org.bukkit.event.player.PlayerVelocityEvent;
 import org.bukkit.util.Vector;
 
 /**
@@ -106,22 +106,33 @@ public final class AntiCheatListener implements Listener {
     // Velocity / knockback — recorded precisely, no blanket bypass
     // ================================================================
 
+    // Mark when a player took damage so the subsequent velocity event can be
+    // attributed to knockback (combat, explosions, projectiles) rather than a
+    // self-propelled velocity (pistons, riptide, launchers). Knockback is
+    // applied within a tick of the damage event.
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onKnockback(PlayerKnockbackEvent event) {
-        // Paper's dedicated knockback event — authoritative for combat hits.
-        PlayerData data = plugin.data(event.getPlayer());
-        Vector v = event.getPlayer().getVelocity();
-        data.applyKnockback(v.getX(), v.getY(), v.getZ());
+    public void onDamageVelocity(EntityDamageEvent event) {
+        if (event.getEntity() instanceof Player victim) {
+            plugin.data(victim).markDamaged();
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onVelocity(EntityVelocityEvent event) {
-        if (!(event.getEntity() instanceof Player player)) return;
+    public void onVelocity(PlayerVelocityEvent event) {
+        Player player = event.getPlayer();
         PlayerData data = plugin.data(player);
         Vector v = event.getVelocity();
-        // Only record meaningful velocities (explosions, projectiles, pistons).
-        // Tiny / zero vectors are ignored so minor events don't mask cheats.
-        if (Math.hypot(v.getX(), v.getZ()) > 0.06 || Math.abs(v.getY()) > 0.1) {
+
+        // Ignore tiny / zero vectors so minor events don't mask cheats.
+        double horizontal = Math.hypot(v.getX(), v.getZ());
+        if (horizontal <= 0.06 && Math.abs(v.getY()) <= 0.1) return;
+
+        // Velocity right after damage is combat/explosion knockback, which the
+        // NoKnockback check validates. Other velocity (launchers, pistons) is
+        // tracked for speed/fly compensation only.
+        if (data.wasDamagedRecently()) {
+            data.applyKnockback(v.getX(), v.getY(), v.getZ());
+        } else {
             data.applyVelocity(v.getX(), v.getY(), v.getZ());
         }
     }
