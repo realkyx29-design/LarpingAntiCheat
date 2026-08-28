@@ -61,9 +61,6 @@ public final class BlockHardness {
         put(Material.MOSS_BLOCK, 0.1f);
         put(Material.PALE_MOSS_CARPET, 0.1f);
         put(Material.PALE_MOSS_BLOCK, 0.1f);
-        put(Material.WOOL, 0.8f);
-        put(Material.CARPET, 0.1f);
-        put(Material.BED, 0.2f);
         put(Material.CAKE, 0.5f);
         put(Material.COBWEB, 4.0f);
         put(Material.DIRT, 0.5f);
@@ -85,7 +82,9 @@ public final class BlockHardness {
         put(Material.SPONGE, 0.6f);
         put(Material.WET_SPONGE, 0.6f);
 
-        // ---- wood set ----
+        // ---- families matched by name suffix (covers all colour/variant
+        //      materials, since generic Material.WOOL / CARPET / BED do not
+        //      exist in the Bukkit API). ----
         for (Material m : Material.values()) {
             String n = m.name();
             if (n.endsWith("_PLANKS")) put(m, 2.0f);
@@ -102,6 +101,15 @@ public final class BlockHardness {
             else if (n.endsWith("_WALL_SIGN") || n.endsWith("_SIGN") || n.endsWith("_HANGING_SIGN"))
                 put(m, 1.0f);
             else if (n.endsWith("_BANNER") || n.endsWith("_WALL_BANNER")) put(m, 1.0f);
+            // Coloured soft families (wool 0.8, carpet 0.1, beds 0.2).
+            else if (n.endsWith("_WOOL")) put(m, 0.8f);
+            else if (n.endsWith("_CARPET")) put(m, 0.1f);
+            else if (n.endsWith("_BED")) put(m, 0.2f);
+            else if (n.endsWith("_CONCRETE_POWDER")) put(m, 0.5f);
+            else if (n.endsWith("_CONCRETE")) put(m, 1.8f);
+            else if (n.endsWith("_TERRACOTTA")) put(m, 1.25f);
+            else if (n.endsWith("_GLASS_PANE") || n.endsWith("_STAINED_GLASS_PANE")) put(m, 0.3f);
+            else if (n.endsWith("_GLASS")) put(m, 0.3f);
         }
 
         // ---- stone / ores / deepslate ----

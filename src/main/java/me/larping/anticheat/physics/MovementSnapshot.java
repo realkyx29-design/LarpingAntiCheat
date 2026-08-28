@@ -145,13 +145,19 @@ public final class MovementSnapshot {
 
         // Movement speed attribute — the real, server-side base speed. This
         // automatically honours custom SMP items/passives that change speed.
+        // The enum constant was renamed across versions: modern Paper/Spigot
+        // (1.21.3+) uses MOVEMENT_SPEED; older builds use GENERIC_MOVEMENT_SPEED.
+        // Resolve it reflectively so the plugin runs on both.
         double speed = 0.1;
         int speedAmp = -1, jumpAmp = -1;
         try {
-            AttributeInstance attr = player.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED);
-            if (attr != null) speed = attr.getValue();
+            Attribute speedAttr = resolveSpeedAttribute();
+            if (speedAttr != null) {
+                AttributeInstance attr = player.getAttribute(speedAttr);
+                if (attr != null) speed = attr.getValue();
+            }
         } catch (Throwable ignored) {
-            // Older/renamed attribute fallback: treat as vanilla.
+            // Attribute unavailable: fall back to vanilla base speed (0.1).
         }
         PotionEffect speedFx = player.getPotionEffect(PotionEffectType.SPEED);
         if (speedFx != null) { speedAmp = speedFx.getAmplifier(); }
@@ -177,6 +183,29 @@ public final class MovementSnapshot {
      */
     public static MovementSnapshot capture(Player player, PlayerData data, Location from, Location to) {
         return new MovementSnapshot(player, data, from, to);
+    }
+
+    /** Cached movement-speed attribute constant (resolved across API versions). */
+    private static Attribute speedAttribute;
+    private static boolean speedAttributeResolved;
+
+    private static Attribute resolveSpeedAttribute() {
+        if (speedAttributeResolved) return speedAttribute;
+        speedAttributeResolved = true;
+        // Attribute is an enum whose constant was renamed across versions:
+        // modern Paper/Spigot (1.21.3+) -> MOVEMENT_SPEED, older -> GENERIC_MOVEMENT_SPEED.
+        try {
+            for (Attribute attr : Attribute.values()) {
+                String n = attr.name();
+                if (n.equals("MOVEMENT_SPEED") || n.equals("GENERIC_MOVEMENT_SPEED")) {
+                    speedAttribute = attr;
+                    break;
+                }
+            }
+        } catch (Throwable ignored) {
+            speedAttribute = null;
+        }
+        return speedAttribute;
     }
 
     private static boolean isWater(Block b) {
