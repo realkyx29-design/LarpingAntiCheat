@@ -3,6 +3,7 @@ package me.larping.anticheat.managers;
 import me.larping.anticheat.checks.Check;
 import me.larping.anticheat.checks.combat.KillAuraCheck;
 import me.larping.anticheat.checks.combat.ReachCheck;
+import me.larping.anticheat.checks.combat.WeaponDamageCheck;
 import me.larping.anticheat.checks.movement.BlinkCheck;
 import me.larping.anticheat.checks.movement.FlyCheck;
 import me.larping.anticheat.checks.movement.GroundSpoofCheck;
@@ -36,6 +37,7 @@ public final class CheckManager {
     private final TimerCheck timer;
     private final ReachCheck reach;
     private final KillAuraCheck killAura;
+    private final WeaponDamageCheck weaponDamage;
     private final ScaffoldCheck scaffold;
     private final FastBreakCheck fastBreak;
     private final NukerCheck nuker;
@@ -54,6 +56,7 @@ public final class CheckManager {
         register(new NoSlowCheck());
         reach = register(new ReachCheck());
         killAura = register(new KillAuraCheck());
+        weaponDamage = register(new WeaponDamageCheck());
         scaffold = register(new ScaffoldCheck());
         fastBreak = register(new FastBreakCheck());
         nuker = register(new NukerCheck());
@@ -75,6 +78,7 @@ public final class CheckManager {
     public TimerCheck timer() { return timer; }
     public ReachCheck reach() { return reach; }
     public KillAuraCheck killAura() { return killAura; }
+    public WeaponDamageCheck weaponDamage() { return weaponDamage; }
     public ScaffoldCheck scaffold() { return scaffold; }
     public FastBreakCheck fastBreak() { return fastBreak; }
     public NukerCheck nuker() { return nuker; }

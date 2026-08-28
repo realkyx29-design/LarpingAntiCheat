@@ -5,7 +5,7 @@ import me.larping.anticheat.checks.CheckContext;
 import me.larping.anticheat.managers.ViolationManager;
 
 /**
- * Base class for combat-related checks (Reach, KillAura).
+ * Base class for combat-related checks (Reach, KillAura, WeaponDamage).
  */
 public abstract class CombatCheck implements Check {
     protected final String checkName;

@@ -42,6 +42,7 @@ public final class CheckDefaults {
     public static final String NO_SLOW = "noslow";
     public static final String REACH = "reach";
     public static final String KILL_AURA = "killaura";
+    public static final String WEAPON_DAMAGE = "weapondamage";
     public static final String SCAFFOLD = "scaffold";
     public static final String FAST_BREAK = "fastbreak";
     public static final String NUKER = "nuker";
@@ -85,6 +86,10 @@ public final class CheckDefaults {
                 t("max-distance", 3.05), t("min-confirmations", 3.0));
         put(KILL_AURA, 0.55, 6.0, 14.0, 30.0,
                 t("max-rotation-snap", 55.0), t("min-confirmations", 2.0));
+        // Weapon damage validates against the real held item's max damage;
+        // the check flags large spikes and cancels only sustained over-damage.
+        put(WEAPON_DAMAGE, 0.60, 8.0, 12.0, 30.0,
+                t("damage-headroom", 4.0), t("min-confirmations", 3.0));
         put(SCAFFOLD, 0.60, 5.0, 12.0, 30.0,
                 t("max-placements-per-sec", 14.0), t("max-reach", 4.5), t("min-confirmations", 4.0));
         put(FAST_BREAK, 0.60, 5.0, 12.0, 30.0,

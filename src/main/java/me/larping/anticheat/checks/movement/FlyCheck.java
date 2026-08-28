@@ -32,8 +32,15 @@ public final class FlyCheck extends MovementCheck {
         MovementSnapshot s = ctx.move();
         if (s == null) return;
 
-        // States fly physics cannot model — handled by dedicated checks/legit.
-        if (s.gliding || s.levitation || s.riptide) { decay(ctx); return; }
+        // --- Fully legitimate flight / airborne states, never flag ---
+        var caps = ctx.data().capabilities();
+        // Creative flight, server-granted (donor/plugin) flight, spectator.
+        if (caps != null && (caps.allowedFlight || caps.flying)) { decay(ctx); return; }
+        // Elytra gliding is its own movement model and is always allowed.
+        if (s.gliding || (caps != null && caps.gliding)) { decay(ctx); return; }
+        // Levitation / riptide are legitimate upward motion.
+        if (s.levitation || s.riptide) { decay(ctx); return; }
+        // Liquids, climbing, webs use different physics.
         if (s.feetInLiquid || s.headInLiquid || s.inLava || s.onClimbable || s.inWeb) {
             decay(ctx); return;
         }
@@ -43,8 +50,13 @@ public final class FlyCheck extends MovementCheck {
 
         double dY = s.deltaY;
         double lastDY = s.lastDeltaY;
-        int maxAir = s.maxSustainedAirTicks(
-                (ctx.cfg().customModsEnabled() && ctx.cfg().customMovementComp()) ? 6 : 0);
+        // Custom-movement allowance: custom-mod config plus equipment that
+        // grants jump/air mobility (custom boots / feather enchantments).
+        double customAir = (ctx.cfg().customModsEnabled() && ctx.cfg().customMovementComp()) ? 6 : 0;
+        if (caps != null && caps.jumpMultiplier > 1.05) {
+            customAir += 10 + (int) (caps.jumpMultiplier * 6);
+        }
+        int maxAir = s.maxSustainedAirTicks(customAir);
 
         boolean airborne = !s.serverGround;
         boolean violation = false;
@@ -57,7 +69,8 @@ public final class FlyCheck extends MovementCheck {
         }
         // 2) Upward acceleration mid-air (gravity must slow the rise).
         else if (airborne && s.airTicks > 3 && dY > 0.42 && lastDY >= dY) {
-            boolean caused = s.jumpAmplifier >= 0 || s.hasVelocity || s.onBouncy;
+            boolean caused = s.jumpAmplifier >= 0 || s.hasVelocity || s.onBouncy
+                    || (caps != null && caps.jumpMultiplier > 1.05);
             if (!caused) {
                 violation = true;
                 reason = "upward-accel dY=" + f(dY) + " lastDY=" + f(lastDY) + " air=" + s.airTicks;

@@ -40,10 +40,22 @@ public final class SpeedCheck extends MovementCheck {
         double speed = s.hSpeed;
         if (speed < 1.0e-4) return; // duplicate / near-look packet
 
+        // Custom-compat factor plus recognised speed-granting equipment
+        // (custom boots/enchants). The live movement-speed attribute already
+        // includes most of this, but explicit custom items widen the limit so
+        // a player with a legit speed item is never flagged.
+        double equipFactor = 1.0;
+        var caps = ctx.data().capabilities();
+        if (caps != null && caps.speedMultiplier > 1.05) {
+            equipFactor = Math.max(equipFactor, caps.speedMultiplier * 0.9);
+        }
+        double customFactor = (ctx.cfg().customModsEnabled() && ctx.cfg().customMovementComp() ? 1.10 : 1.0)
+                * equipFactor;
+
         double limit = s.maxGroundHorizontalSpeed(
                 ctx.ping(), ctx.tps(),
                 ctx.cfg().compensatePing(), ctx.cfg().compensateTps(),
-                (ctx.cfg().customModsEnabled() && ctx.cfg().customMovementComp()) ? 1.10 : 1.0);
+                customFactor);
 
         if (limit == Double.POSITIVE_INFINITY) {
             // Liquid/web/climb: covered by their own tight envelopes; decay.

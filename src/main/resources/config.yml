@@ -209,6 +209,19 @@ checks:
     max-rotation-snap: 55
     min-confirmations: 2
 
+  weapondamage:
+    enabled: true
+    sensitivity: 0.6
+    alert-threshold: 8.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    # Extra headroom (half-hearts) above the held item's true max damage
+    # before a hit is treated as invalid. Custom swords are recognised from
+    # their attribute modifiers, enchantments and (optionally) a registered
+    # custom-modifier provider, so legitimately strong weapons never flag.
+    damage-headroom: 4
+    min-confirmations: 3
+
   # ----------------------------------------------------------------
   # World / interaction
   # ----------------------------------------------------------------

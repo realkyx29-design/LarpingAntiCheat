@@ -27,6 +27,13 @@ public final class PlayerData {
     private final UUID uuid;
     private final String name;
 
+    /**
+     * Cached legitimate-capabilities snapshot (effects/equipment/enchants/
+     * game mode). Rebuilt once per event by the listener so every check reads
+     * the same verified modifier set.
+     */
+    private transient me.larping.anticheat.modifiers.Capabilities capabilities;
+
     // ---------------------------------------------------------------
     // Movement state (updated every move event, main thread)
     // ---------------------------------------------------------------
@@ -151,7 +158,7 @@ public final class PlayerData {
     private double phaseBuffer, noKnockbackBuffer, noSlowBuffer;
     private double jesusBuffer, spiderBuffer, stepBuffer, blinkBuffer;
     private double fastPlaceBuffer, fastBreakBuffer, nukerBuffer;
-    private double reachBuffer, auraBuffer, groundSpoofBuffer;
+    private double reachBuffer, auraBuffer, weaponDamageBuffer, groundSpoofBuffer;
     private int timerFastWindows;
 
     public double buffer(String key) {
@@ -170,6 +177,7 @@ public final class PlayerData {
             case "nuker" -> nukerBuffer;
             case "reach" -> reachBuffer;
             case "killaura" -> auraBuffer;
+            case "weapondamage" -> weaponDamageBuffer;
             case "groundspoof" -> groundSpoofBuffer;
             default -> 0.0;
         };
@@ -193,6 +201,7 @@ public final class PlayerData {
             case "nuker" -> nukerBuffer = v;
             case "reach" -> reachBuffer = v;
             case "killaura" -> auraBuffer = v;
+            case "weapondamage" -> weaponDamageBuffer = v;
             case "groundspoof" -> groundSpoofBuffer = v;
             default -> { }
         }
@@ -203,7 +212,7 @@ public final class PlayerData {
         speedBuffer = flyBuffer = phaseBuffer = noKnockbackBuffer = noSlowBuffer = 0;
         jesusBuffer = spiderBuffer = stepBuffer = blinkBuffer = 0;
         fastPlaceBuffer = fastBreakBuffer = nukerBuffer = 0;
-        reachBuffer = auraBuffer = groundSpoofBuffer = 0;
+        reachBuffer = auraBuffer = weaponDamageBuffer = groundSpoofBuffer = 0;
         timerBalance = timerBurst = 0;
         timerFastWindows = 0;
     }
@@ -450,6 +459,9 @@ public final class PlayerData {
     // ---------------------------------------------------------------
     public UUID uuid() { return uuid; }
     public String playerName() { return name; }
+
+    public me.larping.anticheat.modifiers.Capabilities capabilities() { return capabilities; }
+    public void setCapabilities(me.larping.anticheat.modifiers.Capabilities c) { this.capabilities = c; }
     public double deltaX() { return deltaX; }
     public double deltaY() { return deltaY; }
     public double deltaZ() { return deltaZ; }

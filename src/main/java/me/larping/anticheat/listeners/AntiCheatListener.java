@@ -4,6 +4,8 @@ import me.larping.anticheat.LarpingAntiCheat;
 import me.larping.anticheat.checks.CheckContext;
 import me.larping.anticheat.data.PlayerData;
 import me.larping.anticheat.managers.CheckManager;
+import me.larping.anticheat.modifiers.Capabilities;
+import me.larping.anticheat.modifiers.CustomModifierProvider;
 import me.larping.anticheat.physics.MovementSnapshot;
 import me.larping.anticheat.util.CollisionUtil;
 import org.bukkit.GameMode;
@@ -164,9 +166,16 @@ public final class AntiCheatListener implements Listener {
 
         Player player = event.getPlayer();
         GameMode gm = player.getGameMode();
-        if (gm == GameMode.SPECTATOR) return;
+        // Spectator and creative players move with full server authority
+        // (creative flight, noclip, fast break) — never run movement checks.
+        if (gm == GameMode.SPECTATOR || gm == GameMode.CREATIVE) return;
 
         PlayerData data = plugin.data(player);
+
+        // Build the legitimate-capabilities snapshot once (effects/armour/
+        // enchants/custom items) so every movement check honours it.
+        Capabilities caps = plugin.capabilities().analyze(player, CustomModifierProvider.Context.MOVEMENT);
+        data.setCapabilities(caps);
 
         boolean positionChanged = from.getX() != to.getX()
                 || from.getY() != to.getY()
@@ -263,17 +272,27 @@ public final class AntiCheatListener implements Listener {
         PlayerData data = plugin.data(attacker);
         data.recordAttack(target.getUniqueId());
 
+        // Capabilities for combat: max legitimate damage from the held sword
+        // (attribute + sharpness + strength + recognised custom enchants).
+        Capabilities caps = plugin.capabilities().analyze(attacker, CustomModifierProvider.Context.COMBAT);
+        data.setCapabilities(caps);
+
         CheckContext ctx = new CheckContext(plugin, attacker, data);
         checks.reach().evaluateAttack(attacker, target, ctx);
         checks.killAura().evaluateAttack(attacker, target, ctx);
         checks.killAura().evaluateSnapOnAttack(ctx);
         checks.killAura().evaluate(ctx);
 
-        // --- Server-authoritative enforcement: a sustained reach/aim
-        // violation means the cheat's illegal hit is cancelled entirely. ---
-        if (plugin.configManager().get().enforceCancelAttacks()
-                && plugin.violations().shouldCancelEvent(attacker, "Reach", "KillAura")) {
-            event.setCancelled(true);
+        // --- Server-authoritative enforcement -----------------------------
+        if (plugin.configManager().get().enforceCancelAttacks()) {
+            // Reach/aim violations: the illegal hit is cancelled entirely.
+            if (plugin.violations().shouldCancelEvent(attacker, "Reach", "KillAura")) {
+                event.setCancelled(true);
+            } else if (checks.weaponDamage() != null) {
+                // Damage beyond what the real held weapon can produce: reported
+                // and, once sustained, cancelled — never a hard-coded value.
+                checks.weaponDamage().evaluateAttack(attacker, event, caps, ctx);
+            }
         }
     }
 
@@ -300,8 +319,12 @@ public final class AntiCheatListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBlockDamage(BlockDamageEvent event) {
         Player player = event.getPlayer();
-        CheckContext ctx = new CheckContext(plugin, player, plugin.data(player));
-        checks.fastBreak().recordBreakStart(player, event.getBlock(), ctx);
+        if (player.getGameMode() == GameMode.CREATIVE) return;
+        PlayerData data = plugin.data(player);
+        Capabilities caps = plugin.capabilities().analyze(player, CustomModifierProvider.Context.MINING);
+        data.setCapabilities(caps);
+        CheckContext ctx = new CheckContext(plugin, player, data);
+        checks.fastBreak().recordBreakStart(player, event.getBlock(), caps, ctx);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -309,11 +332,19 @@ public final class AntiCheatListener implements Listener {
         Player player = event.getPlayer();
         if (player.getGameMode() == GameMode.CREATIVE) return;
         PlayerData data = plugin.data(player);
-        CheckContext ctx = new CheckContext(plugin, player, data);
-        checks.fastBreak().evaluateBreak(player, event.getBlock(), ctx);
-        checks.nuker().evaluateBreak(player, event.getBlock(), ctx);
 
-        // Out-of-reach / instamine / nuker breaks are denied server-side.
+        // Mining capabilities: the player's real pickaxe, Efficiency, Haste,
+        // and recognised area-mining custom enchants.
+        Capabilities caps = plugin.capabilities().analyze(player, CustomModifierProvider.Context.MINING);
+        data.setCapabilities(caps);
+        CheckContext ctx = new CheckContext(plugin, player, data);
+
+        checks.fastBreak().evaluateBreak(player, event, caps, ctx);
+        checks.nuker().evaluateBreak(player, event, caps, ctx);
+
+        // Out-of-reach / genuinely-too-fast breaks are denied server-side.
+        // Legitimate area-mining (custom pickaxe 3x3/4x4) is recognised in
+        // the checks via caps.areaMineRadius and never reaches the violation.
         if (plugin.configManager().get().enforceCancelBreaks()
                 && plugin.violations().shouldCancelEvent(player, "FastBreak", "Nuker")) {
             event.setCancelled(true);
