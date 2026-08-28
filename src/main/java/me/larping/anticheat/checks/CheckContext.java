@@ -54,6 +54,44 @@ public final class CheckContext {
     }
 
     /**
+     * True when the player is currently laggy (high smoothed ping) or the
+     * server is running low TPS. Movement-correction / setback and any
+     * movement-position enforcement must NEVER fire while this is true — lag
+     * produces large apparent deltas that look like speed/fly but are not
+     * cheats. Position checks stay lenient during lag; detection keeps
+     * accumulating quietly but cannot teleport or punish a laggy player.
+     */
+    public boolean isLaggy() {
+        int lagPing = Math.max(cfg().lagCompensationPing(), 0);
+        double lagTps = cfg().lagCompensationTps() > 0 ? cfg().lagCompensationTps() : 19.0;
+        return (lagPing > 0 && ping() > lagPing) || tps() < lagTps;
+    }
+
+    /**
+     * Whether movement correction (snap-back) may be applied for this player
+     * right now. Requires: enforcement enabled, not laggy, not OP, not a
+     * legitimate fast/granted state. This is deliberately strict — a setback
+     * should only ever happen for a clearly-impossible, non-lag move.
+     */
+    public boolean mayCorrectMovement() {
+        if (!cfg().enforceCorrectMovement()) return false;
+        if (isFullyExempt()) return false;
+        if (isLaggy()) return false;          // never rubber-band a laggy player
+        if (isPhysicsExempt()) return false;  // elytra/liquid/climb/riptide/levitation
+        MovementSnapshot s = move;
+        if (s != null && (s.gliding || s.riptide || s.hasVelocity
+                || s.inWater || s.feetInLiquid || s.onClimbable || s.inWeb
+                || s.serverGround == false && s.airTicks < 2)) {
+            // gliding, knockback, water, ladders, webs and the first couple of
+            // airborne ticks after leaving ground are never corrected.
+            if (s == null) return true;
+            if (s.gliding || s.riptide || s.hasVelocity || s.inWater
+                    || s.feetInLiquid || s.headInLiquid || s.onClimbable || s.inWeb) return false;
+        }
+        return true;
+    }
+
+    /**
      * True when the player should be completely ignored by checks: bypass
      * permission, creative/spectator, dead/ghost, or in a hard grace window
      * (login / teleport / respawn / world change).

@@ -77,7 +77,7 @@ public final class SpeedCheck extends MovementCheck {
                         "hSpeed=" + f(speed) + " limit=" + f(limit)
                                 + " base=" + f(s.baseSpeed) + " ground=" + s.serverGround
                                 + " ping=" + ctx.ping() + " tps=" + String.format("%.1f", ctx.tps()),
-                        me.larping.anticheat.managers.ViolationManager.Setback.MOVEMENT);
+                        me.larping.anticheat.managers.ViolationManager.Setback.NONE);
             }
         } else {
             ctx.data().adjustBuffer("speed", -1.5, 64.0);
@@ -106,7 +106,7 @@ public final class SpeedCheck extends MovementCheck {
                         Math.min(1.0, 0.3 + excess * 2.0), 0.85,
                         "liquid hSpeed=" + f(s.hSpeed) + " limit=" + f(limit)
                                 + (s.inWeb ? " web" : " water"),
-                        me.larping.anticheat.managers.ViolationManager.Setback.MOVEMENT);
+                        me.larping.anticheat.managers.ViolationManager.Setback.NONE);
             }
         } else {
             ctx.data().adjustBuffer("speed", -1.5, 64.0);
@@ -134,7 +134,7 @@ public final class SpeedCheck extends MovementCheck {
                         Math.min(1.0, 0.4 + excess), Math.min(0.97, 0.70 + excess * 0.9),
                         "elytra hSpeed=" + f(speed) + " limit=" + f(limit)
                                 + " firework=" + s.fireworkBoost,
-                        me.larping.anticheat.managers.ViolationManager.Setback.MOVEMENT);
+                        me.larping.anticheat.managers.ViolationManager.Setback.NONE);
             }
         } else {
             ctx.data().adjustBuffer("speed", -1.5, 64.0);

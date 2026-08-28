@@ -46,7 +46,7 @@ public final class SpiderCheck extends MovementCheck {
                         0.55, 0.92,
                         "climb dY=" + f(s.deltaY) + " hSpeed=" + f(s.hSpeed) + " air=" + s.airTicks
                                 + " buffer=" + (int) buf,
-                        me.larping.anticheat.managers.ViolationManager.Setback.MOVEMENT);
+                        me.larping.anticheat.managers.ViolationManager.Setback.NONE);
             }
         } else {
             ctx.data().adjustBuffer("spider", -2.0, 64.0);

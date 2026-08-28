@@ -60,6 +60,37 @@ public final class Notifier {
         }
     }
 
+    /**
+     * Always writes a console skid line for a violation, in the format:
+     * [Hyphon] detected a skid: <player> : <what> : <count> time(s)
+     * plus a detail line. This runs even below the chat-alert threshold so
+     * logs are never silent. Rate-limited per (player, check) to avoid spam.
+     */
+    public void logFlag(Player player, String check, String category,
+                         double vl, double confidence, String detail) {
+        try {
+            String key = player.getUniqueId() + ":" + check;
+            long now = System.currentTimeMillis();
+            long last = logThrottle.getOrDefault(key, 0L);
+            if (now - last < 1000L) return; // max one skid line per check per second
+            logThrottle.put(key, now);
+
+            String what = describe(check, category);
+            int count = (int) Math.max(1, Math.round(vl));
+            plugin.getLogger().info(String.format(
+                    "[Hyphon] detected a skid: %s : %s : %d time(s)",
+                    player.getName(), what, count));
+            Location l = player.getLocation();
+            String coords = l != null
+                    ? String.format("%.0f,%.0f,%.0f", l.getX(), l.getY(), l.getZ()) : "?";
+            plugin.getLogger().info(String.format(
+                    "    detail: %s conf=%d%% ping=%dms tps=%.1f @%s | %s",
+                    check, (int) (confidence * 100), player.getPing(), plugin.tps(),
+                    coords, detail));
+        } catch (Throwable ignored) { }
+    }
+    private final java.util.Map<String, Long> logThrottle = new java.util.concurrent.ConcurrentHashMap<>();
+
     private void doAlert(Player player, String check, String type, String category,
                          double vl, double confidence, String detail, boolean setback) {
         String name = player.getName();

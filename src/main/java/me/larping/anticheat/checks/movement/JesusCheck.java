@@ -60,7 +60,7 @@ public final class JesusCheck extends MovementCheck {
                         "hSpeed=" + f(s.hSpeed) + " dY=" + f(s.deltaY)
                                 + " below=" + below.getType().name().toLowerCase()
                                 + " buffer=" + (int) buf,
-                        me.larping.anticheat.managers.ViolationManager.Setback.MOVEMENT);
+                        me.larping.anticheat.managers.ViolationManager.Setback.NONE);
             }
         } else {
             decay(ctx);

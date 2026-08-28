@@ -237,7 +237,9 @@ public final class AntiCheatListener implements Listener {
         // ever triggered well past alert thresholds, so legitimate rubber-
         // banding cannot occur.
         var enCfg = plugin.configManager().get();
+        // Correction only when allowed AND not laggy/elytra/legit (see gate).
         if (!data.inHardGrace() && enCfg.enforceCorrectMovement()
+                && ctx.mayCorrectMovement()
                 && plugin.violations().shouldCorrectMovement(player)) {
             Location revert = data.prevLocation();
             if (revert != null && revert.getWorld() != null
@@ -357,11 +359,15 @@ public final class AntiCheatListener implements Listener {
         checks.fastBreak().evaluateBreak(player, event, caps, ctx);
         checks.nuker().evaluateBreak(player, event, caps, ctx);
 
-        // Out-of-reach / genuinely-too-fast breaks are denied server-side.
-        // Legitimate area-mining (custom pickaxe 3x3/4x4) is recognised in
-        // the checks via caps.areaMineRadius and never reaches the violation.
+        // Blocks are NEVER cancelled for fast/area mining — custom pickaxes
+        // (3x3/4x4, fast enchants) legitimately produce those patterns and
+        // are accounted for by the checks above. Only genuinely impossible,
+        // sustained OUT-OF-REACH nuker breaks (not lag, not elytra, not
+        // legitimate mining) are denied, and only when enabled.
         if (plugin.configManager().get().enforceCancelBreaks()
-                && plugin.violations().shouldCancelEvent(player, "FastBreak", "Nuker")) {
+                && !ctx.isLaggy()
+                && plugin.violations().checkVl(player, "Nuker") >= 20
+                && plugin.violations().shouldCancelEvent(player, "Nuker")) {
             event.setCancelled(true);
         }
     }

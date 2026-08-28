@@ -88,16 +88,26 @@ public final class ViolationManager {
         }
 
         // --- Movement correction decision ------------------------------
+        // Only the clearly-impossible checks (fly/phase/blink) request a
+        // correction, and only when setbacks are enabled and the signal is
+        // very strong. The listener additionally refuses to apply it while
+        // the player is laggy or in a legitimate state (elytra/velocity/
+        // liquid/vehicle), so normal walking, elytra flight or lag never
+        // cause a rubber-band.
         boolean correcting = setback == Setback.MOVEMENT && cfg.setbacksEnabled()
-                && total >= cc.setbackThreshold() && confidence >= 0.75;
+                && total >= cc.setbackThreshold() && confidence >= 0.9;
         if (correcting) {
             data.markMovementCorrection();
         }
 
-        // --- Alerts / detailed console log ------------------------------
-        // Every flag above the alert threshold produces a rate-limited,
-        // hoverable chat alert plus a full-detail console record; below the
-        // threshold it is still logged to console when logging is enabled.
+        // --- Console log: ALWAYS record the violation in the skid format
+        // so logs always work even below the chat-alert threshold.
+        try {
+            plugin.notifier().logFlag(player, checkName, categoryFor(checkName),
+                    total, confidence, detail);
+        } catch (Throwable ignored) { }
+
+        // --- Staff chat alert (rate-limited, threshold-gated) -----------
         if (cfg.alertsEnabled() && total >= cc.alertThreshold() && confidence >= 0.6) {
             String key = player.getUniqueId() + ":" + checkName;
             long now = System.currentTimeMillis();
@@ -107,9 +117,6 @@ public final class ViolationManager {
                 plugin.notifier().alert(player, checkName, checkType, categoryFor(checkName),
                         total, confidence, detail, correcting);
             }
-        } else if (cfg.loggingEnabled()) {
-            plugin.notifier().alert(player, checkName, checkType, categoryFor(checkName),
-                    total, confidence, detail, correcting);
         }
 
         // --- Punishments --------------------------------------------------

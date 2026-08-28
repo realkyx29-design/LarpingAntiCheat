@@ -50,7 +50,7 @@ public final class StepCheck extends MovementCheck {
                         "grounded dY=" + f(s.deltaY) + " hSpeed=" + f(s.hSpeed)
                                 + " below=" + s.belowBlock.getType().name().toLowerCase()
                                 + " buffer=" + (int) buf,
-                        me.larping.anticheat.managers.ViolationManager.Setback.MOVEMENT);
+                        me.larping.anticheat.managers.ViolationManager.Setback.NONE);
             }
         } else {
             decay(ctx);
