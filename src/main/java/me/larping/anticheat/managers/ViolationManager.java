@@ -30,6 +30,16 @@ public final class ViolationManager {
 
     public enum Setback { NONE, MOVEMENT }
 
+    /** Strictness of an enforcement decision. */
+    public enum Action {
+        /** Only log / alert / accrue VL. */
+        NONE,
+        /** Cancel the originating event (attack / block place / block break). */
+        CANCEL_EVENT,
+        /** Correct movement by snapping the player back (setTo). */
+        MOVEMENT_SETBACK
+    }
+
     private final LarpingAntiCheat plugin;
 
     /** uuid -> (check name -> VL) */
@@ -101,34 +111,51 @@ public final class ViolationManager {
             }
         }
 
-        // --- Setbacks (movement checks only, rate-limited, high-confidence) -
-        // A setback teleports the player, so it must only fire on a confident
-        // detection (>=0.75) to avoid disrupting legitimate play.
+        // --- Movement correction ----------------------------------------
+        // Instead of a hard teleport (which rubber-bands legit players and
+        // can be glitchy), the listener asks whether the current move should
+        // be rejected. That decision is high-confidence and rate-limited; the
+        // listener applies it with PlayerMoveEvent.setTo to a previously
+        // server-valid position. Enforcement is fully configured.
         if (setback == Setback.MOVEMENT && cfg.setbacksEnabled()
-                && total >= cc.setbackThreshold() && confidence >= 0.75
-                && data.trySetbackCooldown(cfg.setbackCooldownMs())) {
-            Location safe = data.safeLocation();
-            if (safe != null && safe.getWorld() != null
-                    && safe.getWorld().equals(player.getWorld())) {
-                // Already on the server thread when called from events.
-                Runnable doSetback = () -> {
-                    if (player.isOnline() && !player.isDead()) {
-                        player.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
-                        player.teleportAsync(safe);
-                    }
-                };
-                if (Bukkit.isPrimaryThread()) {
-                    doSetback.run();
-                } else {
-                    Bukkit.getScheduler().runTask(plugin, doSetback);
-                }
-            }
+                && total >= cc.setbackThreshold() && confidence >= 0.75) {
+            data.markMovementCorrection();
         }
 
         // --- Punishments --------------------------------------------------
         checkPunishments(player, total);
 
         return total;
+    }
+
+    /**
+     * Whether the player's current movement should be rejected (snapped back
+     * to a known-legal position). True only when a movement correction was
+     * recently requested AND the per-player cooldown allows it.
+     */
+    public boolean shouldCorrectMovement(Player player) {
+        if (!plugin.configManager().get().setbacksEnabled()) return false;
+        PlayerData data = plugin.data(player);
+        return data.consumeMovementCorrection(plugin.configManager().get().setbackCooldownMs());
+    }
+
+    /**
+     * Whether an action (attack / place / break) should be cancelled. True
+     * only for sustained, high-violation checks in the relevant category —
+     * this is the server-authoritative enforcement that actually stops a
+     * cheated action instead of merely reporting it. Gated well above alert
+     * thresholds so a single borderline packet never cancels legit play.
+     */
+    public boolean shouldCancelEvent(Player player, String... checks) {
+        for (String c : checks) {
+            double vl = checkVl(player, c);
+            double cancel = plugin.configManager().get().check(c).setbackThreshold();
+            // Any single category check sustained past its cancel level.
+            if (vl >= cancel) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void broadcastAlert(ConfigManager.Snapshot cfg, Player player, String checkName,
@@ -147,6 +174,13 @@ public final class ViolationManager {
         }
         // Also mirror alerts to the server log so staff can review later.
         plugin.getLogger().info("[ALERT] " + msg);
+    }
+
+    /** Current VL for a single check (0 if none). Used by enforcement gates. */
+    public double checkVl(Player player, String check) {
+        Map<String, Double> map = violationsMap.get(player.getUniqueId());
+        if (map == null) return 0.0;
+        return map.getOrDefault(check, 0.0);
     }
 
     public double total(Player player) {

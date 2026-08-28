@@ -36,11 +36,25 @@ grace-periods:
   respawn: 2000
   world-change: 1500
 
+# --- Enforcement --------------------------------------------------------
+# Detection -> action. All enforcement is server-authoritative and only
+# triggers on SUSTAINED, high-confidence violations (well past the alert
+# thresholds), so legitimate play is never cancelled or snapped back.
 setbacks:
   enabled: true
   # Minimum milliseconds between two setbacks for the same player
   # (prevents rubber-band loops).
   cooldown-ms: 1200
+
+enforcement:
+  # Cancel illegal attacks (reach / killaura) so they do no damage.
+  cancel-attacks: true
+  # Cancel illegal block placements (out-of-reach / far too fast).
+  cancel-blocks: true
+  # Cancel illegal block breaks (instamine / nuker / out-of-reach).
+  cancel-breaks: true
+  # Reject illegal movement packets by snapping back to a valid position.
+  correct-movement: true
 
 punishments:
   enabled: false

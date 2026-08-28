@@ -487,4 +487,23 @@ public final class PlayerData {
         lastSetbackMs = now;
         return true;
     }
+
+    /** Movement correction: a high-confidence movement check requested
+     *  rejection of the current move. Consumed by the listener (rate-limited). */
+    private long correctionRequestedMs = 0L;
+    private long lastCorrectionMs = 0L;
+
+    public void markMovementCorrection() {
+        this.correctionRequestedMs = System.currentTimeMillis();
+    }
+
+    /** Returns true if a correction was requested and the cooldown allows it. */
+    public boolean consumeMovementCorrection(long cooldownMs) {
+        long now = System.currentTimeMillis();
+        // The request must be fresh (this move or the recent correction wave).
+        if (now - correctionRequestedMs > 500L) return false;
+        if (now - lastCorrectionMs < cooldownMs) return false;
+        lastCorrectionMs = now;
+        return true;
+    }
 }

@@ -218,6 +218,28 @@ public final class AntiCheatListener implements Listener {
         checks.get("groundspoof").evaluate(ctx);
         checks.get("phase").evaluate(ctx);
         checks.get("noknockback").evaluate(ctx);
+
+        // --- Server-authoritative movement enforcement ---------------
+        // If a high-confidence, sustained movement check fired (blink /
+        // phase / fly / speed …), reject this packet by snapping back to the
+        // previous server-valid position. setTo fully rewinds the move and
+        // preserves the player's look vector; it is rate-limited and only
+        // ever triggered well past alert thresholds, so legitimate rubber-
+        // banding cannot occur.
+        var enCfg = plugin.configManager().get();
+        if (!data.inHardGrace() && enCfg.enforceCorrectMovement()
+                && plugin.violations().shouldCorrectMovement(player)) {
+            Location revert = data.prevLocation();
+            if (revert != null && revert.getWorld() != null
+                    && revert.getWorld().equals(to.getWorld())) {
+                Location corrected = revert.clone();
+                corrected.setYaw(to.getYaw());
+                corrected.setPitch(to.getPitch());
+                event.setTo(corrected);
+                // Cancel accumulated velocity so the illegal momentum dies.
+                player.setVelocity(new Vector(0, 0, 0));
+            }
+        }
     }
 
     /** Quick gate before building/evaluating checks: creative/dead/bypass handled here. */
@@ -232,10 +254,11 @@ public final class AntiCheatListener implements Listener {
     // Combat
     // ================================================================
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onAttack(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player attacker)) return;
         if (!(event.getEntity() instanceof LivingEntity target)) return;
+        if (attacker.getGameMode() == GameMode.CREATIVE) return;
 
         PlayerData data = plugin.data(attacker);
         data.recordAttack(target.getUniqueId());
@@ -245,19 +268,33 @@ public final class AntiCheatListener implements Listener {
         checks.killAura().evaluateAttack(attacker, target, ctx);
         checks.killAura().evaluateSnapOnAttack(ctx);
         checks.killAura().evaluate(ctx);
+
+        // --- Server-authoritative enforcement: a sustained reach/aim
+        // violation means the cheat's illegal hit is cancelled entirely. ---
+        if (plugin.configManager().get().enforceCancelAttacks()
+                && plugin.violations().shouldCancelEvent(attacker, "Reach", "KillAura")) {
+            event.setCancelled(true);
+        }
     }
 
     // ================================================================
     // Blocks
     // ================================================================
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockPlace(BlockPlaceEvent event) {
         Player player = event.getPlayer();
+        if (player.getGameMode() == GameMode.CREATIVE) return;
         PlayerData data = plugin.data(player);
         data.recordPlacement();
         CheckContext ctx = new CheckContext(plugin, player, data);
         checks.scaffold().evaluatePlace(player, event.getBlockPlaced(), ctx);
+
+        // Illegal placements (out-of-reach / far too fast) are denied.
+        if (plugin.configManager().get().enforceCancelBlocks()
+                && plugin.violations().shouldCancelEvent(player, "Scaffold")) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -267,13 +304,20 @@ public final class AntiCheatListener implements Listener {
         checks.fastBreak().recordBreakStart(player, event.getBlock(), ctx);
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
         Player player = event.getPlayer();
+        if (player.getGameMode() == GameMode.CREATIVE) return;
         PlayerData data = plugin.data(player);
         CheckContext ctx = new CheckContext(plugin, player, data);
         checks.fastBreak().evaluateBreak(player, event.getBlock(), ctx);
         checks.nuker().evaluateBreak(player, event.getBlock(), ctx);
+
+        // Out-of-reach / instamine / nuker breaks are denied server-side.
+        if (plugin.configManager().get().enforceCancelBreaks()
+                && plugin.violations().shouldCancelEvent(player, "FastBreak", "Nuker")) {
+            event.setCancelled(true);
+        }
     }
 
     // Firework boost while gliding extends fly/grace and glide speed envelope.
