@@ -6,6 +6,7 @@ import me.larping.anticheat.config.ConfigManager;
 import me.larping.anticheat.data.PlayerData;
 import me.larping.anticheat.listeners.AntiCheatListener;
 import me.larping.anticheat.managers.CheckManager;
+import me.larping.anticheat.managers.FlightEnforcer;
 import me.larping.anticheat.managers.ViolationManager;
 import me.larping.anticheat.modifiers.CapabilityAnalyzer;
 import me.larping.anticheat.notify.Notifier;
@@ -40,6 +41,7 @@ public final class LarpingAntiCheat extends JavaPlugin {
     private CheckManager checkManager;
     private Notifier notifier;
     private CapabilityAnalyzer capabilities;
+    private FlightEnforcer flightEnforcer;
 
     private volatile double currentTps = 20.0;
 
@@ -50,6 +52,7 @@ public final class LarpingAntiCheat extends JavaPlugin {
         this.notifier = new Notifier(this);
         this.capabilities = new CapabilityAnalyzer();
         this.checkManager = new CheckManager();
+        this.flightEnforcer = new FlightEnforcer(this);
 
         getServer().getPluginManager().registerEvents(new AntiCheatListener(this), this);
 
@@ -91,6 +94,7 @@ public final class LarpingAntiCheat extends JavaPlugin {
                 data.smoothPing(player.getPing());
                 CheckContext ctx = new CheckContext(this, player, data);
                 checkManager.timer().onTick(ctx);
+                flightEnforcer.tick(player);
             } catch (Throwable t) {
                 // A single failing check must never break movement processing.
                 getLogger().warning("Check tick error for " + player.getName() + ": " + t);
@@ -132,6 +136,10 @@ public final class LarpingAntiCheat extends JavaPlugin {
 
     public CapabilityAnalyzer capabilities() {
         return capabilities;
+    }
+
+    public FlightEnforcer flightEnforcer() {
+        return flightEnforcer;
     }
 
     public double tps() {

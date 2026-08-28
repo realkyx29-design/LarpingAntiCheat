@@ -271,6 +271,12 @@ public final class PlayerData {
         vehicleDeltaY = 0.0;
     }
     public int vehicleAirTicks() { return vehicleAirTicks; }
+
+    // ---- Unauthorized-fly sustained tick counter (FlightEnforcer) ----
+    private int flyViolationTicks = 0;
+    public int incrementFlyViolation() { return ++flyViolationTicks; }
+    public void resetFlyViolation() { flyViolationTicks = 0; }
+
     public double vehicleDeltaY() { return vehicleDeltaY; }
 
     // ---- AutoTotem tracking ----

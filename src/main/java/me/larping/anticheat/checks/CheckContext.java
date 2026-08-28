@@ -147,12 +147,32 @@ public final class CheckContext {
         return false;
     }
 
-    /** True when the server actually permits flight (not a client fly hack). */
+    /**
+     * True when the player is actually permitted to fly. The ONLY source of
+     * truth is the server itself ({@code getAllowFlight()}), which is true for
+     * OPs in Creative and for anyone legitimately granted flight (e.g. /fly).
+     * Spectator always flies. Being in Creative does NOT grant flight by itself
+     * here: a non-OP Creative player whose server never enabled flight is not
+     * permitted to fly, so the FlightEnforcer stops it.
+     */
     public static boolean serverAllowsFlight(Player player) {
         try {
-            if (player.getAllowFlight()) return true;
-            GameMode gm = player.getGameMode();
-            return gm == GameMode.CREATIVE || gm == GameMode.SPECTATOR;
+            if (player.getGameMode() == GameMode.SPECTATOR) return true;
+            return player.getAllowFlight();
+        } catch (Throwable t) {
+            return true; // fail open on API errors (avoid false positives)
+        }
+    }
+
+    /** True when flight is currently illegal for this player (flying without
+     *  server permission and not gliding/levitating). Used by FlightEnforcer. */
+    public static boolean isUnauthorizedFlying(Player player) {
+        try {
+            if (serverAllowsFlight(player)) return false;
+            if (player.isGliding()) return false; // elytra
+            if (player.hasPotionEffect(org.bukkit.potion.PotionEffectType.LEVITATION)) return false;
+            if (player.isInsideVehicle()) return false;
+            return player.isFlying();
         } catch (Throwable t) {
             return false;
         }
