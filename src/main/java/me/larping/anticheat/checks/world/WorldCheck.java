@@ -2,16 +2,19 @@ package me.larping.anticheat.checks.world;
 
 import me.larping.anticheat.checks.Check;
 import me.larping.anticheat.checks.CheckContext;
-import org.bukkit.entity.Player;
+import me.larping.anticheat.managers.ViolationManager;
 
 /**
- * Base class for world/interaction checks (Scaffold, FastPlace, etc.).
+ * Base class for world/interaction checks (Scaffold/FastPlace, FastBreak,
+ * Nuker).
  */
 public abstract class WorldCheck implements Check {
     protected final String checkName;
+    protected final String bufferKey;
 
     protected WorldCheck(String checkName) {
         this.checkName = checkName;
+        this.bufferKey = checkName.toLowerCase();
     }
 
     @Override
@@ -24,6 +27,12 @@ public abstract class WorldCheck implements Check {
         return true;
     }
 
-    @Override
-    public abstract void evaluate(Player player, CheckContext context);
+    protected boolean checkEnabled(CheckContext ctx) {
+        return ctx.cfg().checkEnabled(bufferKey);
+    }
+
+    protected void flag(CheckContext ctx, double vlAmount, double confidence, String detail) {
+        ctx.plugin().violations().flag(ctx.player(), checkName, "World",
+                vlAmount, confidence, detail, ViolationManager.Setback.NONE);
+    }
 }

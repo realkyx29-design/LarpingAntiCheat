@@ -1,6 +1,8 @@
 package me.larping.anticheat.commands;
 
 import me.larping.anticheat.LarpingAntiCheat;
+import me.larping.anticheat.checks.Check;
+import me.larping.anticheat.config.CheckConfig;
 import me.larping.anticheat.data.PlayerData;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -8,75 +10,97 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+/**
+ * Administrative command handler for LarpingAntiCheat.
+ *
+ * <p>Check names are derived from the live {@link me.larping.anticheat.managers.CheckManager}
+ * registry, so new checks appear automatically without hardcoded lists.
+ */
 public final class LacCommand implements CommandExecutor, TabCompleter {
+    private boolean admin(CommandSender s) {
+        if (s.isOp()) return true;
+        return s.hasPermission("hyphon.admin") || s.hasPermission("lac.admin");
+    }
+    private boolean debugPerm(CommandSender s) {
+        if (s.isOp()) return true;
+        return s.hasPermission("hyphon.debug") || s.hasPermission("lac.debug");
+    }
+
+
     private final LarpingAntiCheat plugin;
-    private static final List<String> CHECKS = List.of("speed", "fly", "reach", "scaffold", "timer", "groundspoof", "phase", "rotation", "freecam");
 
     public LacCommand(LarpingAntiCheat plugin) {
         this.plugin = plugin;
     }
 
+    private List<String> checkNames() {
+        List<String> names = new ArrayList<>();
+        for (Check c : plugin.checkManager().all()) names.add(c.name().toLowerCase());
+        return names;
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!sender.hasPermission("lac.admin")) {
-            sender.sendMessage("§cYou do not have permission to use LarpingAntiCheat administrative commands.");
+        if (!admin(sender)) {
+            sender.sendMessage("§cYou do not have permission to use Hyphon.");
             return true;
         }
 
         if (args.length == 0) {
-            sender.sendMessage("§8[§cLAC§8] §7LarpingAntiCheat v" + plugin.getDescription().getVersion() + " §8- §aActive");
-            sender.sendMessage("§7Usage: §f/lac <checks|enable|disable|reload|debug|alerts|info|violations|clear>");
+            sender.sendMessage("§8[§cHyphon§8] §7Hyphon v" + plugin.getDescription().getVersion());
+            sender.sendMessage("§7Usage: §f/lac <checks|enable|disable|reload|alerts|violations|clear|debug>");
             return true;
         }
 
         String sub = args[0].toLowerCase();
 
         switch (sub) {
-            case "checks": {
-                sender.sendMessage("§8[§cLAC§8] §eRegistered Cheat Client & Exploit Checks:");
-                for (String check : CHECKS) {
-                    boolean enabled = plugin.configManager().isCheckEnabled(check);
-                    double sensitivity = plugin.configManager().getSensitivity(check);
-                    sender.sendMessage("§7- §f" + check + ": " + (enabled ? "§aENABLED" : "§cDISABLED") + " §7(Sensitivity: §f" + sensitivity + "§7)");
+            case "checks" -> {
+                sender.sendMessage("§8[§cHyphon§8] §eActive checks:");
+                for (Check c : plugin.checkManager().all()) {
+                    CheckConfig cc = plugin.configManager().get().check(c.name());
+                    sender.sendMessage("§7 - §f" + c.name()
+                            + (cc.enabled() ? " §aENABLED" : " §cDISABLED")
+                            + " §7(sens §f" + String.format("%.2f", cc.sensitivity())
+                            + "§7, alert VL §f" + cc.alertThreshold() + "§7)");
                 }
-                break;
             }
-            case "enable":
-            case "disable": {
+            case "enable", "disable" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§cUsage: /lac " + sub + " <check>");
                     return true;
                 }
-                String checkName = args[1].toLowerCase();
-                String path = "checks." + checkName + ".enabled";
-                if (!plugin.getConfig().isSet(path)) {
-                    sender.sendMessage("§cUnknown check: §f" + args[1]);
+                String name = args[1].toLowerCase();
+                if (plugin.checkManager().get(name) == null) {
+                    sender.sendMessage("§cUnknown check: §f" + args[1] + " §7(use /lac checks).");
                     return true;
                 }
                 boolean enable = sub.equals("enable");
-                plugin.getConfig().set(path, enable);
+                plugin.getConfig().set("checks." + name + ".enabled", enable);
                 plugin.saveConfig();
-                sender.sendMessage("§8[§cLAC§8] Check §f" + checkName + " §7has been " + (enable ? "§aenabled" : "§cdisabled") + ".");
-                break;
-            }
-            case "reload": {
                 plugin.configManager().reload();
-                sender.sendMessage("§8[§cLAC§8] §aConfiguration successfully reloaded.");
-                break;
+                sender.sendMessage("§8[§cHyphon§8] Check §f" + name + " §7is now "
+                        + (enable ? "§aenabled" : "§cdisabled") + "§7.");
             }
-            case "alerts": {
-                boolean alerts = plugin.configManager().isAlertsEnabled();
-                plugin.getConfig().set("alerts.enabled", !alerts);
+            case "reload" -> {
+                plugin.configManager().reload();
+                sender.sendMessage("§8[§cHyphon§8] §aConfiguration reloaded.");
+            }
+            case "alerts" -> {
+                boolean now = !plugin.configManager().isAlertsEnabled();
+                plugin.getConfig().set("alerts.enabled", now);
                 plugin.saveConfig();
-                sender.sendMessage("§8[§cLAC§8] Alert broadcasts are now " + (!alerts ? "§aENABLED" : "§cDISABLED") + ".");
-                break;
+                plugin.configManager().reload();
+                sender.sendMessage("§8[§cHyphon§8] Alerts are now "
+                        + (now ? "§aENABLED" : "§cDISABLED") + ".");
             }
-            case "violations":
-            case "info": {
+            case "violations", "info" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§cUsage: /lac " + sub + " <player>");
                     return true;
@@ -86,17 +110,20 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage("§cPlayer not found.");
                     return true;
                 }
-                double total = plugin.violations().total(target);
                 Map<String, Double> breakdown = plugin.violations().getViolations(target);
-                sender.sendMessage("§8[§cLAC§8] §ePlayer §f" + target.getName() + " §eTotal VL: §c" + String.format("%.2f", total));
+                double total = plugin.violations().total(target);
+                sender.sendMessage("§8[§cHyphon§8] §e" + target.getName()
+                        + " §7total VL: §c" + String.format("%.1f", total));
                 if (breakdown.isEmpty()) {
-                    sender.sendMessage("§7No violations recorded.");
+                    sender.sendMessage("§7No violations.");
                 } else {
-                    breakdown.forEach((chk, vl) -> sender.sendMessage("§7- §f" + chk + ": §e" + String.format("%.2f", vl)));
+                    breakdown.entrySet().stream()
+                            .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
+                            .forEach(e -> sender.sendMessage("§7 - §f" + e.getKey()
+                                    + "§7: §e" + String.format("%.1f", e.getValue())));
                 }
-                break;
             }
-            case "clear": {
+            case "clear" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§cUsage: /lac clear <player>");
                     return true;
@@ -107,16 +134,16 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 plugin.violations().clear(target);
-                sender.sendMessage("§8[§cLAC§8] §aCleared all violations for §f" + target.getName() + ".");
-                break;
+                plugin.data(target).resetBuffers();
+                sender.sendMessage("§8[§cHyphon§8] §aCleared violations for §f" + target.getName() + "§a.");
             }
-            case "debug": {
-                if (!sender.hasPermission("lac.debug")) {
-                    sender.sendMessage("§cYou do not have permission to use debug mode.");
+            case "debug" -> {
+                if (!debugPerm(sender)) {
+                    sender.sendMessage("§cYou do not have permission for debug mode.");
                     return true;
                 }
                 if (args.length < 3) {
-                    sender.sendMessage("§cUsage: /lac debug <player> <check|all>");
+                    sender.sendMessage("§cUsage: /lac debug <player> <check|all|off>");
                     return true;
                 }
                 Player target = Bukkit.getPlayerExact(args[1]);
@@ -124,46 +151,53 @@ public final class LacCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage("§cPlayer not found.");
                     return true;
                 }
-                String check = args[2].toLowerCase();
                 PlayerData data = plugin.data(target);
-                boolean debugging = !data.isDebugging(check);
-                data.setDebug(check, debugging);
-                sender.sendMessage("§8[§cLAC§8] Debug mode for §f" + check + " §7on §f" + target.getName() + " is now " + (debugging ? "§aENABLED" : "§cDISABLED") + ".");
-                break;
+                String check = args[2].toLowerCase();
+                if (check.equals("off")) {
+                    data.setDebug("all", false);
+                    sender.sendMessage("§8[§cHyphon§8] Debug disabled for §f" + target.getName() + "§7.");
+                } else {
+                    boolean off = data.isDebugging(check);
+                    if (!check.equals("all")) {
+                        data.setDebug(check, !off);
+                    } else {
+                        data.setDebug("all", !off);
+                    }
+                    sender.sendMessage("§8[§cHyphon§8] Debug §f" + check + " §7on §f" + target.getName()
+                            + " §7is now " + (off ? "§cOFF" : "§aON") + ".");
+                }
             }
-            default:
-                sender.sendMessage("§cUnknown subcommand. Use /lac for help.");
-                break;
+            default -> sender.sendMessage("§cUnknown subcommand. Use §f/lac§c for help.");
         }
         return true;
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (!sender.hasPermission("lac.admin")) {
-            return List.of();
-        }
+        if (!admin(sender)) return List.of();
+
         if (args.length == 1) {
-            return Stream.of("checks", "enable", "disable", "reload", "alerts", "violations", "info", "clear", "debug")
+            return Stream.of("checks", "enable", "disable", "reload", "alerts",
+                            "violations", "info", "clear", "debug")
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .toList();
         }
         if (args.length == 2) {
             String sub = args[0].toLowerCase();
             if (sub.equals("enable") || sub.equals("disable")) {
-                return CHECKS.stream()
+                return checkNames().stream()
                         .filter(s -> s.startsWith(args[1].toLowerCase()))
                         .toList();
             }
-            if (sub.equals("violations") || sub.equals("info") || sub.equals("clear") || sub.equals("debug")) {
+            if (List.of("violations", "info", "clear", "debug").contains(sub)) {
                 return Bukkit.getOnlinePlayers().stream()
                         .map(Player::getName)
-                        .filter(name -> name.toLowerCase().startsWith(args[1].toLowerCase()))
+                        .filter(n -> n.toLowerCase().startsWith(args[1].toLowerCase()))
                         .toList();
             }
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("debug")) {
-            return Stream.concat(Stream.of("all"), CHECKS.stream())
+            return Stream.concat(Stream.of("all", "off"), checkNames().stream())
                     .filter(s -> s.startsWith(args[2].toLowerCase()))
                     .toList();
         }

@@ -1,19 +1,33 @@
 # =====================================================================
-# LarpingAntiCheat - Production Configuration
-# Focused on patching modern cheat clients (TikTok / Web cheat clients)
-# Conservative & Custom-SMP friendly for Paper 1.21.11
+# Hyphon - Configuration
+# Paper 1.21+ anti-cheat for custom SMP servers.
+#
+# Checks use server-side physics + block collision shapes, so they
+# cannot be bypassed by client ground-spoofing or "I'm on fire / taking
+# knockback" style tricks used against older versions.
+#
+# VL (violation level) accrues per check; alerts fire at alert-threshold,
+# setbacks (movement checks) at setback-threshold, punishments at
+# punishment-threshold (punishments disabled by default).
 # =====================================================================
 
 alerts:
   enabled: true
-  format: "[LAC] Player §f%player% §7failed §f%check% §7(VL: §c%vl%§7, Ping: §e%ping%ms§7, TPS: §e%tps%§7)"
+  # Rate limit per player+check (milliseconds) to prevent alert spam.
+  cooldown-ms: 1500
+  # Staff alerts are hoverable: hover over an alert for the full debug box
+  # (category, VL, confidence, ping, TPS, location, offsets). Every flag is
+  # also written to the console/log in full detail.
+  format: "&c[Hyphon] &f%player% &7failed &f%check% &7(VL &c%vl%&7, ping &e%ping%ms&7, tps &e%tps%&7)"
 
 logging:
   enabled: false
   include-location: true
 
 exempt-permission: "lac.bypass"
-violation-decay-per-second: 0.20
+
+# VL removed from every check once per second.
+violation-decay-per-second: 0.25
 
 compensation:
   ping: true
@@ -21,15 +35,50 @@ compensation:
 
 grace-periods:
   teleport: 1000
-  velocity: 500
-  damage: 500
   join: 2000
   respawn: 2000
   world-change: 1500
 
+# --- Enforcement --------------------------------------------------------
+# Detection -> action. All enforcement is server-authoritative and only
+# triggers on SUSTAINED, high-confidence violations (well past the alert
+# thresholds), so legitimate play is never cancelled or snapped back.
 setbacks:
-  enabled: true
-  conservative-only: true
+  # ----------------------------------------------------------------
+  # Hyphon is DETECTION + LOGGING by default. It will NOT teleport,
+  # kick or ban anyone. Set enabled:true (or any enforcement.* below
+  # to true) only once you want active blocking. Laggy players, elytra
+  # flight, vehicles, water, custom gear and Creative/Spectator are
+  # never set back even when this is on.
+  # ----------------------------------------------------------------
+  enabled: false
+  # Minimum milliseconds between two setbacks for the same player
+  # (prevents rubber-band loops).
+  cooldown-ms: 1200
+
+enforcement:
+  # LOG-ONLY by default: Hyphon detects and logs every violation but never
+  # cancels or teleports. Turn a flag to true to actively block that action.
+  cancel-attacks: true
+  cancel-blocks: false
+  cancel-breaks: false
+  correct-movement: false
+  # Detect unauthorized flight (including non-OP Creative players flying
+  # without server permission). When true, illegal flight is turned off
+  # (no teleport); when false it is only logged.
+  enforce-flight: true
+  # Re-apply server knockback when a client cancels it (anti-velocity).
+  # Off by default because it is strong; enable once you confirm no false positives.
+  enforce-velocity: false
+
+# Lag handling: when a player's smoothed ping is above this (ms) or the server
+# TPS is below this value, movement correction and position flags are
+# suppressed — lag is never treated as cheating.
+compensation:
+  ping: true
+  tps: true
+  lag-ping: 120
+  lag-tps: 19.0
 
 punishments:
   enabled: false
@@ -47,75 +96,230 @@ compatibility:
     combat-compensation: true
     block-placement-compensation: true
 
+# Sensitivity scales VL weight: weight = amount * (0.5 + sensitivity*0.5)
+# 0.6 = default. Lower = lenient, higher = stricter.
 checks:
+
+  # ----------------------------------------------------------------
+  # Movement
+  # ----------------------------------------------------------------
   speed:
     enabled: true
-    sensitivity: 0.4
+    sensitivity: 0.6
     alert-threshold: 6.0
     setback-threshold: 12.0
     punishment-threshold: 30.0
-    max-horizontal-per-tick: 0.85
-    min-confirmations: 8
+    # Vanilla sprint-jump peak horizontal speed (blocks/tick).
+    max-horizontal-per-tick: 0.362
+    min-confirmations: 6
 
   fly:
     enabled: true
-    sensitivity: 0.4
-    alert-threshold: 6.0
-    setback-threshold: 12.0
-    punishment-threshold: 30.0
-    air-ticks: 55
-    min-confirmations: 8
-
-  reach:
-    enabled: true
-    sensitivity: 0.4
-    alert-threshold: 6.0
-    setback-threshold: 12.0
-    punishment-threshold: 30.0
-    max-distance: 3.85
-    min-confirmations: 6
-
-  scaffold:
-    enabled: true
-    sensitivity: 0.4
-    alert-threshold: 6.0
-    setback-threshold: 12.0
-    punishment-threshold: 30.0
-    max-placements-per-sec: 25
-    min-confirmations: 6
+    sensitivity: 0.6
+    alert-threshold: 5.0
+    setback-threshold: 10.0
+    punishment-threshold: 25.0
+    # Airborne ticks tolerated while NOT accelerating down (beyond jumps).
+    max-air-ticks: 18
+    min-confirmations: 4
 
   timer:
     enabled: true
-    sensitivity: 0.4
+    sensitivity: 0.6
     alert-threshold: 6.0
     setback-threshold: 12.0
     punishment-threshold: 30.0
-    min-confirmations: 12
-
-  groundspoof:
-    enabled: true
-    sensitivity: 0.4
-    alert-threshold: 5.0
-    setback-threshold: 10.0
-    punishment-threshold: 25.0
+    # Packet-credit balance that indicates a sped-up game timer.
+    balance-threshold: 9
+    min-fast-windows: 10
+    # Allowed client speed factor before balance grows.
+    allowed-factor: 1.16
 
   phase:
     enabled: true
-    sensitivity: 0.4
+    sensitivity: 0.7
+    alert-threshold: 4.0
+    setback-threshold: 8.0
+    punishment-threshold: 20.0
+    min-confirmations: 3
+    # Collision sampling step along the move path (blocks).
+    sample-step: 0.5
+
+  groundspoof:
+    enabled: true
+    sensitivity: 0.6
     alert-threshold: 5.0
     setback-threshold: 10.0
     punishment-threshold: 25.0
+    min-confirmations: 3
 
-  rotation:
+  jesus:
     enabled: true
-    sensitivity: 0.4
+    sensitivity: 0.6
+    alert-threshold: 5.0
+    setback-threshold: 10.0
+    punishment-threshold: 25.0
+    min-confirmations: 6
+
+  spider:
+    enabled: true
+    sensitivity: 0.6
+    alert-threshold: 5.0
+    setback-threshold: 10.0
+    punishment-threshold: 25.0
+    min-confirmations: 6
+    min-climb-ticks: 10
+
+  step:
+    enabled: true
+    sensitivity: 0.6
+    alert-threshold: 5.0
+    setback-threshold: 10.0
+    punishment-threshold: 25.0
+    # Max upward blocks per move while grounded (vanilla step is ~0.6).
+    max-step-height: 0.85
+    min-confirmations: 2
+
+  blink:
+    enabled: true
+    sensitivity: 0.8
+    alert-threshold: 4.0
+    setback-threshold: 8.0
+    punishment-threshold: 20.0
+    max-horizontal-delta: 6.0
+    max-vertical-delta: 5.0
+
+  noknockback:
+    enabled: true
+    sensitivity: 0.55
+    alert-threshold: 6.0
+    setback-threshold: 14.0
+    punishment-threshold: 30.0
+    # Minimum observed/expected displacement after knockback.
+    min-velocity-ratio: 0.35
+    min-confirmations: 3
+
+  noslow:
+    enabled: true
+    sensitivity: 0.55
     alert-threshold: 6.0
     setback-threshold: 12.0
     punishment-threshold: 30.0
+    min-confirmations: 4
 
-  freecam:
+  # ----------------------------------------------------------------
+  # Combat
+  # ----------------------------------------------------------------
+  reach:
     enabled: true
-    sensitivity: 0.4
+    sensitivity: 0.65
+    alert-threshold: 5.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    # Eye-to-hitbox maximum (blocks); vanilla survival is 3.0.
+    max-distance: 3.05
+    min-confirmations: 3
+
+  killaura:
+    enabled: true
+    sensitivity: 0.55
+    alert-threshold: 6.0
+    setback-threshold: 14.0
+    punishment-threshold: 30.0
+    # Max yaw snap (degrees) immediately followed by a hit.
+    max-rotation-snap: 55
+    min-confirmations: 2
+
+  weapondamage:
+    enabled: true
+    sensitivity: 0.6
+    alert-threshold: 8.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    # Extra headroom (half-hearts) above the held item's true max damage
+    # before a hit is treated as invalid. Custom swords are recognised from
+    # their attribute modifiers, enchantments and (optionally) a registered
+    # custom-modifier provider, so legitimately strong weapons never flag.
+    damage-headroom: 4
+    min-confirmations: 3
+
+  boatfly:
+    enabled: true
+    sensitivity: 0.55
+    alert-threshold: 6.0
+    setback-threshold: 10.0
+    punishment-threshold: 25.0
+    # Ticks a boat may stay unsupported (no water/ground) before boat-fly.
+    min-supported-air-ticks: 8
+    min-confirmations: 8
+
+  autototem:
+    enabled: true
+    sensitivity: 0.5
     alert-threshold: 6.0
     setback-threshold: 12.0
     punishment-threshold: 30.0
+    # Reaction time (ms) below which a totem re-swap is sub-human. Accounts
+    # for ping/TPS; single fast swaps never flag.
+    reaction-ms: 60
+    min-confirmations: 5
+
+  autocrystal:
+    enabled: true
+    sensitivity: 0.5
+    alert-threshold: 7.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    # Max eye-to-crystal distance for place/break (survival interaction).
+    max-reach: 6.0
+    min-confirmations: 8
+
+  autoweb:
+    enabled: true
+    sensitivity: 0.5
+    alert-threshold: 6.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    min-confirmations: 6
+
+  esp:
+    enabled: true
+    sensitivity: 0.5
+    alert-threshold: 6.0
+    # ESP is a honey-pot/log check only; never setback or punishment.
+    setback-threshold: 100.0
+    punishment-threshold: 100.0
+    # Repeated reactions to hidden decoys required before alerting.
+    min-confirmations: 3
+
+  # ----------------------------------------------------------------
+  # World / interaction
+  # ----------------------------------------------------------------
+  scaffold:
+    enabled: true
+    sensitivity: 0.6
+    alert-threshold: 5.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    max-placements-per-sec: 14
+    max-reach: 4.5
+    min-confirmations: 4
+
+  fastbreak:
+    enabled: true
+    sensitivity: 0.6
+    alert-threshold: 5.0
+    setback-threshold: 12.0
+    punishment-threshold: 30.0
+    # Smallest observed/expected break-time ratio.
+    min-break-fraction: 0.55
+    min-confirmations: 2
+
+  nuker:
+    enabled: true
+    sensitivity: 0.7
+    alert-threshold: 4.0
+    setback-threshold: 10.0
+    punishment-threshold: 25.0
+    max-breaks-per-sec: 14
+    max-reach: 5.2

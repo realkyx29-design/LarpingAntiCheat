@@ -1,16 +1,21 @@
 package me.larping.anticheat.checks.movement;
 
 import me.larping.anticheat.checks.CheckContext;
-import org.bukkit.Location;
-import org.bukkit.block.Block;
-import org.bukkit.entity.Player;
-import org.bukkit.potion.PotionEffectType;
+import me.larping.anticheat.config.CheckConfig;
+import me.larping.anticheat.physics.MovementSnapshot;
 
 /**
- * Enterprise-grade Speed check tailored for Paper 1.21.11 and custom SMP mechanics.
- * Accurately accounts for sprinting, jumping, potion effects, ice, slime, soul sand,
- * honey, water, lava, stairs, slabs, block friction, vehicles, knockback, velocity,
- * teleportation, damage, ping, and server TPS.
+ * Physics-based horizontal speed check.
+ *
+ * <p>The limit is derived from the player's real server-side movement speed
+ * attribute (which automatically accounts for custom SMP items/passives),
+ * sprint-jump physics and speed potions, with additive, bounded slack for
+ * latency/TPS — so a cheat cannot sneak through by stacking multipliers (the
+ * old design multiplied sprint × ice × custom-mod × ping × TPS into a ~7×
+ * ceiling), while legitimate speed modifiers are always honoured.
+ *
+ * <p>Gliding, liquids, cobwebs, climbables and riptide are bounded by their
+ * own dedicated envelopes/checks rather than a generous ground limit.
  */
 public final class SpeedCheck extends MovementCheck {
 
@@ -19,78 +24,124 @@ public final class SpeedCheck extends MovementCheck {
     }
 
     @Override
-    public boolean enabled() {
-        return true;
-    }
+    public void evaluate(me.larping.anticheat.checks.CheckContext ctx) {
+        if (exempt(ctx) || !checkEnabled(ctx)) return;
+        MovementSnapshot s = ctx.move();
+        if (s == null) return;
 
-    @Override
-    public void evaluate(Player player, CheckContext context) {
-        if (shouldBypass(player, context)) return;
-        if (!context.plugin().configManager().isCheckEnabled("speed")) return;
+        CheckConfig cc = ctx.cfg().check("speed");
+        double minConfirm = cc.v2() > 0 ? cc.v2() : 6.0;
 
-        Location from = context.data().lastLocation();
-        Location to = player.getLocation();
-        if (from == null || to == null || from.getWorld() != to.getWorld()) return;
+        if (s.gliding) {
+            evaluateGlide(ctx, s, cc, minConfirm);
+            return;
+        }
 
-        double deltaH = Math.hypot(to.getX() - from.getX(), to.getZ() - from.getZ());
-        double baseLimit = context.plugin().getConfig().getDouble("checks.speed.max-horizontal-per-tick", 0.78);
+        double speed = s.hSpeed;
+        if (speed < 1.0e-4) return; // duplicate / near-look packet
 
-        // Account for walk speed attribute, sprinting, and jump boosts
-        if (player.isSprinting()) baseLimit *= 1.35;
-        if (player.hasPotionEffect(PotionEffectType.SPEED)) {
-            var effect = player.getPotionEffect(PotionEffectType.SPEED);
-            if (effect != null) {
-                int amp = effect.getAmplifier() + 1;
-                baseLimit *= (1.0 + (0.22 * amp));
+        // Custom-compat factor plus recognised speed-granting equipment
+        // (custom boots/enchants). The live movement-speed attribute already
+        // includes most of this, but explicit custom items widen the limit so
+        // a player with a legit speed item is never flagged.
+        double equipFactor = 1.0;
+        var caps = ctx.data().capabilities();
+        if (caps != null && caps.speedMultiplier > 1.05) {
+            equipFactor = Math.max(equipFactor, caps.speedMultiplier * 0.9);
+        }
+        double customFactor = (ctx.cfg().customModsEnabled() && ctx.cfg().customMovementComp() ? 1.10 : 1.0)
+                * equipFactor;
+
+        double limit = s.maxGroundHorizontalSpeed(
+                ctx.ping(), ctx.tps(),
+                ctx.cfg().compensatePing(), ctx.cfg().compensateTps(),
+                customFactor);
+
+        if (limit == Double.POSITIVE_INFINITY) {
+            // Liquid/web/climb: covered by their own tight envelopes; decay.
+            if (s.feetInLiquid || s.headInLiquid || s.inWeb) {
+                evaluateLiquid(ctx, s, minConfirm);
             }
-        }
-        if (player.hasPotionEffect(PotionEffectType.JUMP_BOOST)) {
-            baseLimit *= 1.18;
+            return;
         }
 
-        // Account for custom SMP mods & environmental blocks (ice, slime, soul sand, honey, water, lava, stairs, slabs)
-        Block blockUnder = to.clone().subtract(0, 0.1, 0).getBlock();
-        String blockName = blockUnder.getType().name();
-        if (blockName.contains("ICE") || blockName.contains("SLIME") || blockName.contains("HONEY") ||
-            blockName.contains("SOUL_SAND") || blockName.contains("STAIRS") || blockName.contains("SLAB") ||
-            blockUnder.isLiquid() || player.isGliding() || player.isClimbing()) {
-            baseLimit *= 1.55; // Generous tolerance for custom blocks, ice, stairs, and SMP custom mechanics
-        }
+        double excess = speed - limit;
+        boolean violation = excess > 0.0;
 
-        // Custom mod compatibility compensation
-        if (context.plugin().getConfig().getBoolean("compatibility.custom-mods.enabled", true) &&
-            context.plugin().getConfig().getBoolean("compatibility.custom-mods.movement-compensation", true)) {
-            baseLimit *= 1.30; // Extra tolerance for custom mod mechanics
-        }
-
-        // Ping and TPS compensation
-        int ping = context.ping();
-        if (context.plugin().getConfig().getBoolean("compensation.ping", true) && ping > 50) {
-            baseLimit *= (1.0 + (ping / 800.0));
-        }
-        double tps = context.tps();
-        if (context.plugin().getConfig().getBoolean("compensation.tps", true) && tps < 19.0) {
-            baseLimit *= (1.0 + ((20.0 - tps) / 8.0));
-        }
-
-        if (deltaH > baseLimit) {
-            int buffer = context.data().speedBuffer(context.data().speedBuffer() + 1);
-            int minConfirm = context.plugin().getConfig().getInt("checks.speed.min-confirmations", 5);
-            if (buffer >= minConfirm) {
-                double excess = deltaH - baseLimit;
-                double vlAmount = Math.min(1.0, excess * 2.5);
-                double confidence = Math.min(0.92, 0.65 + (excess * 0.5));
-                context.plugin().violations().add(
-                        player,
-                        "Speed",
-                        "Movement",
-                        vlAmount,
-                        confidence,
-                        "deltaH=" + String.format("%.3f", deltaH) + ", limit=" + String.format("%.3f", baseLimit) + ", buffer=" + buffer + ", ping=" + ping + ", tps=" + String.format("%.1f", tps)
-                );
+        if (violation) {
+            double confidence = Math.min(0.97, 0.62 + excess * 1.6);
+            double buf = ctx.data().adjustBuffer("speed", 1.0, 64.0);
+            if (buf >= minConfirm) {
+                ctx.plugin().violations().flag(ctx.player(), checkName, "Movement",
+                        Math.min(1.0, 0.35 + excess * 2.2), confidence,
+                        "hSpeed=" + f(speed) + " limit=" + f(limit)
+                                + " base=" + f(s.baseSpeed) + " ground=" + s.serverGround
+                                + " ping=" + ctx.ping() + " tps=" + String.format("%.1f", ctx.tps()),
+                        me.larping.anticheat.managers.ViolationManager.Setback.NONE);
             }
         } else {
-            context.data().speedBuffer(context.data().speedBuffer() - 1);
+            ctx.data().adjustBuffer("speed", -1.5, 64.0);
         }
+    }
+
+    /** Tight horizontal envelope while submerged in liquid or in a cobweb. */
+    private void evaluateLiquid(CheckContext ctx, MovementSnapshot s, double minConfirm) {
+        double limit;
+        if (s.inWeb) limit = 0.10;
+        else if (s.headInLiquid) limit = 0.13; // fully submerged swim cap
+        else limit = 0.22;                    // wading / surface
+        // active velocity (e.g. water current / riptide launch) adds directly;
+        // speed potion is already reflected in s.baseSpeed (attribute value).
+        limit += s.velocityH;
+        // Custom SMP movement modifiers also flow through baseSpeed, so only a
+        // small sprint factor remains for surface wading.
+        if (s.sprinting) limit *= 1.15;
+
+        boolean violation = s.hSpeed > limit;
+        if (violation) {
+            double excess = s.hSpeed - limit;
+            double buf = ctx.data().adjustBuffer("speed", 1.0, 64.0);
+            if (buf >= minConfirm) {
+                ctx.plugin().violations().flag(ctx.player(), checkName, "Movement",
+                        Math.min(1.0, 0.3 + excess * 2.0), 0.85,
+                        "liquid hSpeed=" + f(s.hSpeed) + " limit=" + f(limit)
+                                + (s.inWeb ? " web" : " water"),
+                        me.larping.anticheat.managers.ViolationManager.Setback.NONE);
+            }
+        } else {
+            ctx.data().adjustBuffer("speed", -1.5, 64.0);
+        }
+    }
+
+    /** Elytra speed envelope — generous but bounded, with firework/riptide allowances. */
+    private void evaluateGlide(CheckContext ctx, MovementSnapshot s, CheckConfig cc, double minConfirm) {
+        double speed = s.hSpeed;
+        double limit = 1.95;                 // sustained elytra glide
+        if (s.fireworkBoost) limit = 2.7;    // firework rocket boost
+        if (s.riptide) limit = 3.3;          // trident launch
+        limit += s.velocityH;
+        if (ctx.cfg().compensatePing() && ctx.ping() > 80)
+            limit += Math.min(0.3, (ctx.ping() - 80) / 900.0);
+        if (ctx.cfg().compensateTps() && ctx.tps() < 19.0)
+            limit += Math.min(0.4, (20.0 - ctx.tps()) * 0.08);
+
+        boolean violation = speed > limit;
+        if (violation) {
+            double excess = speed - limit;
+            double buf = ctx.data().adjustBuffer("speed", 1.0, 64.0);
+            if (buf >= minConfirm) {
+                ctx.plugin().violations().flag(ctx.player(), checkName, "Movement",
+                        Math.min(1.0, 0.4 + excess), Math.min(0.97, 0.70 + excess * 0.9),
+                        "elytra hSpeed=" + f(speed) + " limit=" + f(limit)
+                                + " firework=" + s.fireworkBoost,
+                        me.larping.anticheat.managers.ViolationManager.Setback.NONE);
+            }
+        } else {
+            ctx.data().adjustBuffer("speed", -1.5, 64.0);
+        }
+    }
+
+    private static String f(double d) {
+        return String.format("%.3f", d);
     }
 }
