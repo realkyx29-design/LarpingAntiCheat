@@ -13,6 +13,7 @@ import me.larping.anticheat.honeypot.Honeypot;
 import me.larping.anticheat.checks.honeypot.EspCheck;
 import me.larping.anticheat.modifiers.CapabilityAnalyzer;
 import me.larping.anticheat.notify.Notifier;
+import me.larping.anticheat.notify.DiscordWebhook;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -43,6 +44,7 @@ public final class LarpingAntiCheat extends JavaPlugin {
     private ViolationManager violationManager;
     private CheckManager checkManager;
     private Notifier notifier;
+    private DiscordWebhook webhook;
     private CapabilityAnalyzer capabilities;
     private FlightEnforcer flightEnforcer;
     private DecoyService decoyService;
@@ -58,7 +60,7 @@ public final class LarpingAntiCheat extends JavaPlugin {
         // plugin from enabling — the server always starts.
         safe("config", () -> this.configManager = new ConfigManager(this));
         safe("violations", () -> this.violationManager = new ViolationManager(this));
-        safe("notifier", () -> this.notifier = new Notifier(this));
+        safe("notifier", () -> { this.notifier = new Notifier(this); rebuildWebhook(); });
         safe("capabilities", () -> this.capabilities = new CapabilityAnalyzer());
         safe("checks", () -> this.checkManager = new CheckManager());
         safe("flight-enforcer", () -> this.flightEnforcer = new FlightEnforcer(this));
@@ -171,6 +173,29 @@ public final class LarpingAntiCheat extends JavaPlugin {
 
     public Notifier notifier() {
         return notifier;
+    }
+
+    /** Builds/rebuilds the Discord webhook from config (safe if blank). */
+    public void rebuildWebhook() {
+        try {
+            String url = getConfig() != null ? getConfig().getString("logs.discord-webhook", "") : "";
+            this.webhook = new DiscordWebhook(url);
+        } catch (Throwable t) {
+            this.webhook = new DiscordWebhook(null);
+        }
+    }
+
+    public DiscordWebhook webhook() {
+        if (webhook == null) rebuildWebhook();
+        return webhook;
+    }
+
+    /** Sends an alert to Discord if a webhook is configured (non-blocking). */
+    public void discordLog(String message) {
+        try {
+            DiscordWebhook w = webhook();
+            if (w != null && w.isEnabled()) w.send(message);
+        } catch (Throwable ignored) { }
     }
 
     public CapabilityAnalyzer capabilities() {

@@ -24,6 +24,11 @@ logging:
   enabled: true
   include-location: true
 
+# Discord webhook: every detection is POSTed here (non-blocking). Leave blank
+# to disable. Example: https://discord.com/api/webhooks/123/abc
+logs:
+  discord-webhook: "https://discord.com/api/webhooks/1545179629923471360/CqjgM9FfqqUZjMDkL8HPoHIZfFrh-gqNAv7T5JP-GCrFAGEFbEn_-opVnVzXOxVQlbAa"
+
 exempt-permission: "lac.bypass"
 
 # VL removed from every check once per second.

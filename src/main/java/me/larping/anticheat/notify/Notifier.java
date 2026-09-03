@@ -87,6 +87,17 @@ public final class Notifier {
                     "    detail: %s conf=%d%% ping=%dms tps=%.1f @%s | %s",
                     check, (int) (confidence * 100), player.getPing(), plugin.tps(),
                     coords, detail));
+            // Mirror to Discord (non-blocking, no-op if no webhook configured).
+            try {
+                plugin.discordLog("🚨 **[Hyphon] detected a skid**\n"
+                        + "**Player:** " + player.getName()
+                        + "\n**Detected:** " + what
+                        + "\n**Check:** " + check
+                        + "\n**Count:** " + count
+                        + "\n**Location:** " + coords
+                        + "\n**Ping:** " + player.getPing() + "ms | **TPS:** "
+                        + String.format("%.1f", plugin.tps()));
+            } catch (Throwable ignored) { }
         } catch (Throwable ignored) { }
     }
     private final java.util.Map<String, Long> logThrottle = new java.util.concurrent.ConcurrentHashMap<>();

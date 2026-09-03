@@ -629,6 +629,35 @@ public final class PlayerData {
     public int noHitDelayCount() { return noHitDelayTicks; }
     public long millisSinceAttack() { return lastAttackMs == 0L ? 100000 : System.currentTimeMillis() - lastAttackMs; }
 
+    // ---- Freecam: body-frozen with camera teleport out/return tracking ----
+    private org.bukkit.Location freecamAnchor = null;
+    private long freecamAnchorMs = 0L;
+
+    /**
+     * Notes that the player moved to `to`. Returns true if this move looks like
+     * a freecam excursion and snap-back: the player previously stayed at an
+     * anchor, is now jumping a large distance in one tick, or returning to a
+     * recently-frozen position. Only the MOVING-body variant of freecam (which
+     * actually teleports the player) is detectable; a pure camera detaching
+     * from a stationary body is invisible to the server and handled in docs.
+     */
+    public boolean isFreecamSnap(org.bukkit.Location to) {
+        if (to == null) return false;
+        long now = System.currentTimeMillis();
+        if (freecamAnchor == null || freecamAnchor.getWorld() == null
+                || to.getWorld() == null || !freecamAnchor.getWorld().equals(to.getWorld())) {
+            freecamAnchor = to.clone(); freecamAnchorMs = now; return false;
+        }
+        double d = freecamAnchor.toVector().distance(to.toVector());
+        // A single move > 12 blocks with no teleport event = freecam/blink camera.
+        boolean snap = d > 12.0;
+        // Roll the anchor forward so a legit teleport (which sets a teleport
+        // grace and rebuilds anchors elsewhere) doesn't keep firing.
+        if (now - freecamAnchorMs > 1500) { freecamAnchor = to.clone(); freecamAnchorMs = now; }
+        return snap;
+    }
+    public void resetFreecam() { freecamAnchor = null; freecamAnchorMs = 0L; }
+
     // ---------------------------------------------------------------
     // Safe / last locations
     // ---------------------------------------------------------------
