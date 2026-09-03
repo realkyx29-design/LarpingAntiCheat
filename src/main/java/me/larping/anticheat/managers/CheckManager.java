@@ -5,6 +5,7 @@ import me.larping.anticheat.checks.combat.KillAuraCheck;
 import me.larping.anticheat.checks.combat.ReachCheck;
 import me.larping.anticheat.checks.combat.AutoTotemCheck;
 import me.larping.anticheat.checks.combat.AutoCrystalCheck;
+import me.larping.anticheat.checks.combat.CombatAutomationCheck;
 import me.larping.anticheat.checks.combat.WeaponDamageCheck;
 import me.larping.anticheat.checks.movement.BlinkCheck;
 import me.larping.anticheat.checks.movement.BoatFlyCheck;
@@ -42,6 +43,7 @@ public final class CheckManager {
     private final ReachCheck reach;
     private final KillAuraCheck killAura;
     private final WeaponDamageCheck weaponDamage;
+    private final CombatAutomationCheck combatAutomation;
     private final BoatFlyCheck boatFly;
     private final AutoTotemCheck autoTotem;
     private final AutoCrystalCheck autoCrystal;
@@ -65,6 +67,7 @@ public final class CheckManager {
         reach = register(new ReachCheck());
         killAura = register(new KillAuraCheck());
         weaponDamage = register(new WeaponDamageCheck());
+        combatAutomation = register(new CombatAutomationCheck());
         boatFly = register(new BoatFlyCheck());
         autoTotem = register(new AutoTotemCheck());
         autoCrystal = register(new AutoCrystalCheck());
@@ -91,6 +94,7 @@ public final class CheckManager {
     public ReachCheck reach() { return reach; }
     public KillAuraCheck killAura() { return killAura; }
     public WeaponDamageCheck weaponDamage() { return weaponDamage; }
+    public CombatAutomationCheck combatAutomation() { return combatAutomation; }
     public BoatFlyCheck boatFly() { return boatFly; }
     public AutoTotemCheck autoTotem() { return autoTotem; }
     public AutoCrystalCheck autoCrystal() { return autoCrystal; }

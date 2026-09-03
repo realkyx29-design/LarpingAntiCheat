@@ -43,6 +43,7 @@ public final class CheckDefaults {
     public static final String REACH = "reach";
     public static final String KILL_AURA = "killaura";
     public static final String WEAPON_DAMAGE = "weapondamage";
+    public static final String COMBAT_AUTOMATION = "combatautomation";
     public static final String BOAT_FLY = "boatfly";
     public static final String AUTO_TOTEM = "autototem";
     public static final String AUTO_CRYSTAL = "autocrystal";
@@ -95,6 +96,9 @@ public final class CheckDefaults {
         // the check flags large spikes and cancels only sustained over-damage.
         put(WEAPON_DAMAGE, 0.60, 8.0, 12.0, 30.0,
                 t("damage-headroom", 4.0), t("min-confirmations", 3.0));
+        // No Hit Delay + triggerbot/aim-assist cadence.
+        put(COMBAT_AUTOMATION, 0.60, 6.0, 12.0, 30.0,
+                t("min-hit-interval-ms", 220.0), t("robotic-cv", 0.08));
         // Exploit / automation checks (multi-signal, high confirm thresholds).
         put(BOAT_FLY, 0.55, 6.0, 10.0, 25.0,
                 t("min-supported-air-ticks", 8.0), t("min-confirmations", 8.0));

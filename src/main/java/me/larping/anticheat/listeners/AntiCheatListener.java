@@ -21,6 +21,7 @@ import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityResurrectEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
@@ -288,6 +289,8 @@ public final class AntiCheatListener implements Listener {
         checks.killAura().evaluateAttack(attacker, target, ctx);
         checks.killAura().evaluateSnapOnAttack(ctx);
         checks.killAura().evaluate(ctx);
+        // No Hit Delay / TriggerBot / AimAssist cadence (uses held item + caps).
+        checks.combatAutomation().evaluateAttack(attacker, target, caps, ctx);
 
         // --- Server-authoritative enforcement -----------------------------
         // 1) Hard-impossible hit: target physically behind the attacker or far
@@ -391,6 +394,18 @@ public final class AntiCheatListener implements Listener {
                 && plugin.violations().shouldCancelEvent(player, "Nuker")) {
             event.setCancelled(true);
         }
+    }
+
+    // A totem of undying was used. Validate the swap wasn't a super-human auto-totem
+    // (offhand totem re-equipped in the reaction window after lethal damage).
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onTotemPop(EntityResurrectEvent event) {
+        if (event.isCancelled()) return;
+        if (!(event.getEntity() instanceof Player player)) return;
+        if (player.getGameMode() == GameMode.CREATIVE) return;
+        PlayerData data = plugin.data(player);
+        CheckContext ctx = new CheckContext(plugin, player, data);
+        checks.autoTotem().recordTotemUse(player, ctx);
     }
 
     // Firework boost while gliding extends fly/grace and glide speed envelope.

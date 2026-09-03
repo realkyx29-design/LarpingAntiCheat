@@ -259,8 +259,9 @@ public final class ViolationManager {
         double reach = checkVl(player, "Reach");
         double aura = checkVl(player, "KillAura");
         double weapon = checkVl(player, "WeaponDamage");
+        double automation = checkVl(player, "CombatAutomation");
         // Sustained violations: cancel once any combat check has a handful.
-        return reach >= 4.0 || aura >= 4.0 || weapon >= 5.0;
+        return reach >= 4.0 || aura >= 4.0 || weapon >= 5.0 || automation >= 5.0;
     }
 
 }

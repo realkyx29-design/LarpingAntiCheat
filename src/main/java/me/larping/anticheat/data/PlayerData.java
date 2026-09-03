@@ -159,6 +159,7 @@ public final class PlayerData {
     private double jesusBuffer, spiderBuffer, stepBuffer, blinkBuffer;
     private double fastPlaceBuffer, fastBreakBuffer, nukerBuffer;
     private double reachBuffer, auraBuffer, weaponDamageBuffer, groundSpoofBuffer;
+    private double noHitDelayBuffer, triggerBotBuffer;
     private double boatFlyBuffer, autoTotemBuffer, autoCrystalBuffer, autoWebBuffer, espBuffer;
     private int timerFastWindows;
 
@@ -184,6 +185,8 @@ public final class PlayerData {
             case "autocrystal" -> autoCrystalBuffer;
             case "autoweb" -> autoWebBuffer;
             case "esp" -> espBuffer;
+            case "nohitdelay" -> noHitDelayBuffer;
+            case "triggerbot" -> triggerBotBuffer;
             case "groundspoof" -> groundSpoofBuffer;
             default -> 0.0;
         };
@@ -213,6 +216,8 @@ public final class PlayerData {
             case "autocrystal" -> autoCrystalBuffer = v;
             case "autoweb" -> autoWebBuffer = v;
             case "esp" -> espBuffer = v;
+            case "nohitdelay" -> noHitDelayBuffer = v;
+            case "triggerbot" -> triggerBotBuffer = v;
             case "groundspoof" -> groundSpoofBuffer = v;
             default -> { }
         }
@@ -224,6 +229,7 @@ public final class PlayerData {
         jesusBuffer = spiderBuffer = stepBuffer = blinkBuffer = 0;
         fastPlaceBuffer = fastBreakBuffer = nukerBuffer = 0;
         reachBuffer = auraBuffer = weaponDamageBuffer = groundSpoofBuffer = 0;
+        noHitDelayBuffer = triggerBotBuffer = 0;
         boatFlyBuffer = autoTotemBuffer = autoCrystalBuffer = autoWebBuffer = espBuffer = 0;
         timerBalance = timerBurst = 0;
         timerFastWindows = 0;
@@ -572,6 +578,56 @@ public final class PlayerData {
     public int distinctTargetsLastSecond() {
         return distinctTargets;
     }
+
+    // ---------------------------------------------------------------
+    // Attack cadence / hit-delay tracking (TriggerBot, No Hit Delay, AimAssist)
+    // ---------------------------------------------------------------
+    private long lastAttackMs = 0L;
+    private final Deque<Long> attackIntervals = new ArrayDeque<>();
+    private int noHitDelayTicks = 0;
+
+    /** Records an attack timestamp and returns interval since the previous (ms). */
+    public long recordAttackCadence() {
+        long now = System.currentTimeMillis();
+        long interval = lastAttackMs == 0L ? Long.MAX_VALUE : (now - lastAttackMs);
+        if (interval != Long.MAX_VALUE) {
+            attackIntervals.addLast(interval);
+            // keep a rolling window of recent attacks
+            while (attackIntervals.size() > 20) attackIntervals.pollFirst();
+        }
+        lastAttackMs = now;
+        return interval;
+    }
+
+    /** Average recent attack interval in ms (large if not enough samples). */
+    public double avgAttackInterval() {
+        if (attackIntervals.size() < 6) return 1e9;
+        long sum = 0; int n = 0;
+        for (long v : attackIntervals) { if (v < 5000) { sum += v; n++; } }
+        return n < 6 ? 1e9 : (double) sum / n;
+    }
+
+    /**
+     * Robotic cadence: standard deviation of recent attack intervals relative to
+     * their mean. Human clicking has variance; triggerbot/aimbot is near-metronomic.
+     * Returns the coefficient of variation (0 = perfectly robotic).
+     */
+    public double attackIntervalVariance() {
+        if (attackIntervals.size() < 8) return 1.0;
+        java.util.List<Long> sample = new java.util.ArrayList<>();
+        for (long v : attackIntervals) if (v < 5000) sample.add(v);
+        if (sample.size() < 8) return 1.0;
+        double mean = 0; for (long v : sample) mean += v; mean /= sample.size();
+        double var = 0; for (long v : sample) var += (v - mean) * (v - mean);
+        var /= sample.size();
+        double sd = Math.sqrt(var);
+        return mean <= 0 ? 1.0 : sd / mean;
+    }
+
+    /** Records that a hit landed below the weapon cooldown threshold. */
+    public void recordNoHitDelay() { noHitDelayTicks++; }
+    public int noHitDelayCount() { return noHitDelayTicks; }
+    public long millisSinceAttack() { return lastAttackMs == 0L ? 100000 : System.currentTimeMillis() - lastAttackMs; }
 
     // ---------------------------------------------------------------
     // Safe / last locations
