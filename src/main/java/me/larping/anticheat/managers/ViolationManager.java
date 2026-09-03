@@ -260,8 +260,10 @@ public final class ViolationManager {
         double aura = checkVl(player, "KillAura");
         double weapon = checkVl(player, "WeaponDamage");
         double automation = checkVl(player, "CombatAutomation");
-        // Sustained violations: cancel once any combat check has a handful.
-        return reach >= 4.0 || aura >= 4.0 || weapon >= 5.0 || automation >= 5.0;
+        // Sustained violations: cancel after a small number of confirmations.
+        // Hard-impossible hits (out of range / behind) are cancelled immediately
+        // in the listener; these thresholds catch repeated-but-subtle cheats.
+        return reach >= 2.0 || aura >= 2.0 || weapon >= 3.0 || automation >= 2.0;
     }
 
 }

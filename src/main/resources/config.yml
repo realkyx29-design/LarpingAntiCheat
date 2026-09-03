@@ -21,7 +21,7 @@ alerts:
   format: "&c[Hyphon] &f%player% &7failed &f%check% &7(VL &c%vl%&7, ping &e%ping%ms&7, tps &e%tps%&7)"
 
 logging:
-  enabled: false
+  enabled: true
   include-location: true
 
 exempt-permission: "lac.bypass"
@@ -51,7 +51,7 @@ setbacks:
   # flight, vehicles, water, custom gear and Creative/Spectator are
   # never set back even when this is on.
   # ----------------------------------------------------------------
-  enabled: false
+  enabled: true
   # Minimum milliseconds between two setbacks for the same player
   # (prevents rubber-band loops).
   cooldown-ms: 1200
@@ -60,16 +60,16 @@ enforcement:
   # LOG-ONLY by default: Hyphon detects and logs every violation but never
   # cancels or teleports. Turn a flag to true to actively block that action.
   cancel-attacks: true
-  cancel-blocks: false
-  cancel-breaks: false
-  correct-movement: false
+  cancel-blocks: true
+  cancel-breaks: true
+  correct-movement: true
   # Detect unauthorized flight (including non-OP Creative players flying
   # without server permission). When true, illegal flight is turned off
   # (no teleport); when false it is only logged.
   enforce-flight: true
   # Re-apply server knockback when a client cancels it (anti-velocity).
   # Off by default because it is strong; enable once you confirm no false positives.
-  enforce-velocity: false
+  enforce-velocity: true
 
 # Lag handling: when a player's smoothed ping is above this (ms) or the server
 # TPS is below this value, movement correction and position flags are
